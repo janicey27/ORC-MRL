@@ -434,7 +434,8 @@ def splitter(df,  # pandas dataFrame
 
              classification='LogisticRegression',  # string: classification alg
 
-             it=6):  # integer: max number of iterations
+             it=6,
+             OutputFlag = 1):  # integer: max number of iterations
 
     nc = k
 
@@ -447,14 +448,14 @@ def splitter(df,  # pandas dataFrame
         c, a = findContradiction(df_new, th)
 
         if c != -1:
-
-            print(df_new.groupby(
-
-                    ['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
+            if OutputFlag == 1:
+                print(df_new.groupby(
+    
+                        ['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
 
             a, b = contradiction(df_new, c, a)
-
-            print(c, a, b)
+            if OutputFlag == 1:
+                print(c, a, b)
 
             df_new = split(df_new, c, a, b, T, pfeatures, nc, classification)
 
@@ -467,23 +468,10 @@ def splitter(df,  # pandas dataFrame
         if not cont:
 
             break
-
-    print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
+    if OutputFlag == 1:
+        print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
 
     return(df_new)
 
 #################################################################
 
-def Purity(df):
-    su = pd.DataFrame(df.groupby(['CLUSTER'])['OG_CLUSTER']
-    .value_counts(normalize=True)).reset_index(level=0)
-    su.columns= ['CLUSTER','Purity']
-    return su.groupby('CLUSTER')['Purity'].max()
-
-import matplotlib.pyplot as plt
-
-def plot_features(df):
-    x=  list(df['FEATURE_1'])
-    y=  list(df['FEATURE_2'])
-    plt.scatter(x, y)
-    plt.show()
