@@ -65,7 +65,7 @@ deterministic = True
 
 pfeatures = 2
 
-sigma = [[0.05, 0], [0, 0.05]]
+sigma = [[0.01, 0], [0, 0.01]]
 
 N = 1000
 
