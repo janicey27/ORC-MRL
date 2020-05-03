@@ -354,7 +354,7 @@ def sample_MDP_with_features_list(P,R, #MDP parameters
             x = distributions[s]()
             a = int(m*np.random.rand())
             s_prime = choices(range(n),P[a,s,:])[0]
-            samples.append((x,a,R[s],s))
+            samples.append((i,t,x,a,R[s],s))
             s = s_prime
     return samples
 

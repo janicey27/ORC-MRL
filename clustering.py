@@ -52,12 +52,14 @@ def UnifNormal(n,  # integer: number of observations
 def transformSamples(samples,  # array: samples generated bu MDPTools
                      pfeatures):  # integer: number of features
     n = len(samples)
-    features = np.array([samples[i][0] for i in range(n)])
-    df1 = pd.DataFrame(features, columns=['FEATURE_' + str(
+    df1 = pd.DataFrame([samples[i][:2] for i in range(n)], columns=[
+            'ID', 'TIME'])
+    features = np.array([samples[i][2] for i in range(n)])
+    df2 = pd.DataFrame(features, columns=['FEATURE_' + str(
             i+1) for i in range(pfeatures)])
-    df2 = pd.DataFrame([samples[i][1:] for i in range(n)], columns=[
+    df3 = pd.DataFrame([samples[i][-3:] for i in range(n)], columns=[
             'ACTION', 'RISK', 'OG_CLUSTER'])
-    df = pd.concat([df1, df2], sort=False, axis=1)
+    df = pd.concat([df1, df2, df3], sort=False, axis=1)
     return(df)
 
 
@@ -66,10 +68,10 @@ def transformSamples(samples,  # array: samples generated bu MDPTools
 # and a random seed (optional) and returns a dataframe
 # with two new columns 'CLUSTER' and 'NEXT_CLUSTER'
 def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
-                       T,  # integer: time horizon
                        clustering='KMeans',  # string: clustering algorithm
                        n_clusters=8,  # number of clusters
                        random_state=0):  # random seed for the clustering
+    df = df.copy()
     if clustering == 'KMeans':
         output = KMeans(
                 n_clusters=n_clusters, random_state=random_state).fit(
@@ -86,7 +88,7 @@ def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
         output = LabelEncoder().fit_transform(np.array(df.RISK).reshape(-1, 1))
     df['CLUSTER'] = output
     df['NEXT_CLUSTER'] = df['CLUSTER'].shift(-1)
-    df.loc[df.index % T == T-1, 'NEXT_CLUSTER'] = 'None'
+    df.loc[df['ID'] != df['ID'].shift(-1), 'NEXT_CLUSTER'] = 'None'
     return(df)
 #################################################################
 
@@ -102,7 +104,6 @@ def findContradiction(df, # pandas dataFrame
     X = df.loc[:, ['CLUSTER', 'NEXT_CLUSTER', 'ACTION']]
     X = X[X.NEXT_CLUSTER != 'None']
     count = X.groupby(['CLUSTER', 'ACTION'])['NEXT_CLUSTER'].nunique()
-    print('checkpoint contradiction')
     contradictions = list(count[list(count > 1)].index)
     
     if len(contradictions) > 0:
@@ -146,7 +147,6 @@ def split(df,  # pandas dataFrame
           i,  # integer: initial cluster
           a,  # integer: action taken
           c,  # integer: target cluster
-          T,  # integer: time horizon
           pfeatures,  # integer: number of features
           k,  # integer: intedexer for next cluster
           classification='LogisticRegression'):  # string: classification aglo
@@ -164,7 +164,7 @@ def split(df,  # pandas dataFrame
 
     for j in range(len(groups)):
 
-        d = pd.DataFrame(groups[j].iloc[:, :pfeatures].values.tolist())
+        d = pd.DataFrame(groups[j].iloc[:, 2:2+pfeatures].values.tolist())
 
         data[j] = d
 
@@ -204,11 +204,17 @@ def split(df,  # pandas dataFrame
         ids = np.concatenate((ids, id2))
     
 
-    
+    '''
     df.loc[df.index.isin(ids), 'CLUSTER'] = k
     newids = ids-1
     newids = np.where((newids%T) != (T-1), newids, -1)
     df.loc[df.index.isin(newids), 'NEXT_CLUSTER'] = k
+    '''
+    
+    df.loc[df.index.isin(ids), 'CLUSTER'] = k
+    newids = ids-1
+    df.loc[(df.index.isin(newids)) & 
+           (df['ID']== df['ID'].shift(-1)), 'NEXT_CLUSTER'] = k
 
     return(df)
 
@@ -220,7 +226,6 @@ def split(df,  # pandas dataFrame
 # Returns the final resulting dataframe
 
 def splitter(df,  # pandas dataFrame
-             T,  # integer: time horizon
              pfeatures,  # integer: number of features
              k,  # integer: indexer
              th, # integer: threshold for minimum split
@@ -242,7 +247,7 @@ def splitter(df,  # pandas dataFrame
             
             if OutputFlag == 1:
                 print(c, a, b)
-            df_new = split(df_new, c, a, b, T, pfeatures, nc, classification)
+            df_new = split(df_new, c, a, b, pfeatures, nc, classification)
             #print(df_new.head())
             cont = True
             nc += 1

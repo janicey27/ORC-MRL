@@ -6,8 +6,6 @@ Main MDP clustering algorithm running.
 
 """
 
-
-
 #################################################################
 # Set Working Directory
 
@@ -29,13 +27,13 @@ from testing import *
 
 #################################################################
 # Set Parameters
-n = 20
-m = 5
+n = 10
+m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.03, 0], [0, 0.03]]
-N = 100
+sigma = [[0.05, 0], [0, 0.05]]
+N = 10
 T = 5
 clustering = ''
 n_clusters = 3
@@ -90,10 +88,10 @@ samples = sample_MDP_with_features_list(P,
 df = transformSamples(samples,
                       pfeatures)#################################################################
 
+df_train, df_test = split_train_test_by_id(df, 0.2, 'ID')
 #################################################################
 # Initialize Clusters
-df = initializeClusters(df,
-                        T,
+df = initializeClusters(df_train,
                         clustering=clustering,
                         n_clusters=n_clusters,
                         random_state=random_state)
@@ -101,8 +99,8 @@ df = initializeClusters(df,
 
 #################################################################
 # Run Iterative Learning Algorithm
+
 df_new = splitter(df,
-                  T,
                   pfeatures,
                   k,
                   th,
@@ -115,4 +113,5 @@ print(Purity(df_new))
 #plot_features(df)
 #
 print('training accuracy:',training_accuracy(df_new)[0])
-print('Training R2:', R2_value(df_new,N,T))
+
+#print('Training R2:', R2_value(df_new,N))
