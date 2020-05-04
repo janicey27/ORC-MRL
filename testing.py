@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import binascii
+from sklearn.tree import DecisionTreeClassifier
 
 #maps each OG_ClUSTER to a cluster --> We map a cluster to the OG_CLUSTER most 
 #present in it
@@ -61,45 +62,48 @@ def predict_value_of_cluster(P_df,R_df,cluster,actions):
 #Compute E((\hat{v}-v)^2) ie the expect error in estimating the value given actions
 #NEED TO CHANGE: must adapt to case where T is diffrent from one simulation to another.
 # add Ids of simulations
-def training_value_error(df_new,N):
+def training_value_error(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
     df2 = df_new.reset_index()
     df2 = df2.groupby(['ID']).first()
+   # print(df2)
+    N = df2.shape[0]
     #print(df2)
     #print(df_new)
     for i in range(N):
-        s = df2['CLUSTER'].loc[i]
-        a = df2['ACTION'].loc[i]
-        v_true = df2['RISK'].loc[i]
+        s = df2['CLUSTER'].iloc[i]
+        a = df2['ACTION'].iloc[i]
+        v_true = df2['RISK'].iloc[i]
         #print('s, a, r', s, a, v_true)
         v_estim = R_df.loc[s]
-        index = df2['index'].loc[i]
+        index = df2['index'].iloc[i]
         #print('index', index, index.dtype)
         #index = int(index)
         cont = True
         t = 1
         while cont:
             #print('index', index, 't', t)
-            #print('next risk', df_new['RISK'].iloc[index + t])
-            v_true = v_true + df_new['RISK'].iloc[index + t]
+            #print('next risk', df_new['RISK'].loc[index + t])
+            v_true = v_true + df_new['RISK'].loc[index + t]
             #print('new v_true', v_true)
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
-            a = df_new['ACTION'].iloc[index + t]
+            a = df_new['ACTION'].loc[index + t]
             #print('new action', a, ' \n')
+            #print('next estimated risk', R_df.loc[s])
             v_estim = v_estim + R_df.loc[s]
             try: 
-                df_new['ID'].iloc[index+t+1]
+                df_new['ID'].loc[index+t+1]
             except:
                 break
-            if df_new['ID'].iloc[index+t] != df_new['ID'].iloc[index+t+1]:
+            if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
                 break
             t += 1
-            
+        #print('true vs estimate', v_true, v_estim)
         E_v = E_v + (v_true-v_estim)**2
     return (E_v/N)
 #    return np.sqrt((E_v/N))/(R_df.max()*T)
@@ -127,23 +131,77 @@ def training_value_error_old(df_new,N,T):
         E_v = E_v + (v_true-v_estim)**2
     return (E_v/N)
 
-def R2_value(df_new, N):
+# takes in a dataframe of testing data, and dataframe of new clustered data
+# predicts initial cluster, and then run analysis on v_predict and v_true
+def testing_value_error(df_test, df_new, pfeatures):
+    E_v = 0
+    P_df,R_df = get_MDP(df_new)
+    df2 = df_test.reset_index()
+    df2 = df2.groupby(['ID']).first()
+    N = df2.shape[0]
+    
+    # training prediction model
+    X = df_new.iloc[:, 2:2+pfeatures]
+    y = df_new['CLUSTER']
+    m = DecisionTreeClassifier()
+    m.fit(X, y)
+    
+    clusters = m.predict(df2.iloc[:, 2:2+pfeatures])
+    df2['CLUSTER'] = clusters
+    #print(df2)
+    for i in range (N):
+        s = df2['CLUSTER'].iloc[i]
+        a = df2['ACTION'].iloc[i]
+        v_true = df2['RISK'].iloc[i]
+        #print('s, a, r', s, a, v_true)
+        v_estim = R_df.loc[s]
+        index = df2['index'].iloc[i]
+        cont = True
+        t = 1
+        while cont:
+            #print('index', index, 't', t)
+            #print('next risk', df_test['RISK'].loc[index + t])
+            v_true = v_true + df_test['RISK'].loc[index + t]
+            #print('new v_true', v_true)
+            try:
+                s = P_df.loc[s,a].values[0]
+            # error raises in case we never saw a given transition in the data
+            except TypeError:
+                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+            a = df_test['ACTION'].loc[index + t]
+            #print('new action', a, ' \n')
+            v_estim = v_estim + R_df.loc[s]
+            #print('next estimated risk', R_df.loc[s])
+            try: 
+                df_test['ID'].loc[index+t+1]
+            except:
+                break
+            if df_test['ID'].loc[index+t] != df_test['ID'].loc[index+t+1]:
+                break
+            t += 1
+        #print('true vs estimate', v_true, v_estim)
+        E_v = E_v + (v_true-v_estim)**2
+    return (E_v/N)
+
+
+def R2_value(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
     df2 = df_new.reset_index()
     df2 = df2.groupby(['ID']).first()
+    N = df2.shape[0]
     V_true = []
     for i in range(N):
-        s = df2['CLUSTER'].loc[i]
-        a = df2['ACTION'].loc[i]
-        v_true = df2['RISK'].loc[i]
+        s = df2['CLUSTER'].iloc[i]
+        a = df2['ACTION'].iloc[i]
+        v_true = df2['RISK'].iloc[i]
         V_true.append(v_true)
         v_estim = R_df.loc[s]
-        index = df2['index'].loc[i]
+        index = df2['index'].iloc[i]
         cont = True
         t = 1
         while cont:
-            v_true = v_true + df_new['RISK'].iloc[index + t]
+            v_true = v_true + df_new['RISK'].loc[index + t]
             V_true.append(v_true)
 
             try:
@@ -151,14 +209,14 @@ def R2_value(df_new, N):
             # error raises in case we never saw a given transition in the data
             except TypeError:
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
-            a = df_new['ACTION'].iloc[index + t]
+            a = df_new['ACTION'].loc[index + t]
 
             v_estim = v_estim + R_df.loc[s]
             try: 
-                df_new['ID'].iloc[index+t+1]
+                df_new['ID'].loc[index+t+1]
             except:
                 break
-            if df_new['ID'].iloc[index+t] != df_new['ID'].iloc[index+t+1]:
+            if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
                 break
             t += 1
         E_v = E_v + (v_true-v_estim)**2
@@ -224,3 +282,4 @@ def split_train_test_by_id(data, test_ratio, id_column):
     ids = data[id_column]
     in_test_set = ids.apply(lambda id_: test_set_check(id_, test_ratio))
     return data.loc[~in_test_set], data.loc[in_test_set]
+

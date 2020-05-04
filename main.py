@@ -32,8 +32,8 @@ m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.05, 0], [0, 0.05]]
-N = 10
+sigma = [[0.03, 0], [0, 0.03]]
+N = 100
 T = 5
 clustering = ''
 n_clusters = 3
@@ -113,5 +113,7 @@ print(Purity(df_new))
 #plot_features(df)
 #
 print('training accuracy:',training_accuracy(df_new)[0])
+print('training error:', training_value_error(df_new))
+print('testing error:', testing_value_error(df_test, df_new, pfeatures))
 
 #print('Training R2:', R2_value(df_new,N))
