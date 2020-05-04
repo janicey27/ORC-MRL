@@ -42,6 +42,7 @@ k = n_clusters
 classification = 'DecisionTreeClassifier'
 n_iter = 16
 th = int(0.1*N*(T-1)/n)
+ratio = 0.2 # portion of data to be used for testing
 #################################################################
 
 
@@ -88,7 +89,7 @@ samples = sample_MDP_with_features_list(P,
 df = transformSamples(samples,
                       pfeatures)#################################################################
 
-df_train, df_test = split_train_test_by_id(df, 0.2, 'ID')
+df_train, df_test = split_train_test_by_id(df, ratio, 'ID')
 #################################################################
 # Initialize Clusters
 df = initializeClusters(df_train,
