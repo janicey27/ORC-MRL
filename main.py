@@ -33,15 +33,15 @@ reward_dep_action = False
 deterministic = True
 pfeatures = 2
 sigma = [[0.1, 0], [0, 0.1]]
-N = 300
-T = 5
+N = 500
+T = 10
 clustering = ''
 n_clusters = 3
 random_state = 0
 k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 5
-th = 0 #int(0.1*N*(T-1)/n)
+n_iter = 16
+th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.2 # portion of data to be used for testing
 #################################################################
 
@@ -107,7 +107,8 @@ df_new = splitter(df,
                   th,
                   df_test,
                   classification,
-                  n_iter)
+                  n_iter,
+                  OutputFlag = 0)
 
 #################################################################
 

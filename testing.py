@@ -33,7 +33,7 @@ def training_accuracy(df_new):
     #accuracy = clusters.loc[df_new['CLUSTER'] == df_new['OG_CLUSTER']]
     tr_accuracy = accuracy.mean()
     accuracy_df = accuracy.to_frame('Accuracy')
-    accuracy_df['OG_CLUSTER'] = df_new['OG_CLUSTER']
+    accuracy_df['OG_CLUSTER'] = df_new.reset_index()['OG_CLUSTER']
     accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
     return (tr_accuracy,accuracy_df)
 
@@ -319,10 +319,12 @@ def Purity(df):
 
 
 def plot_features(df):
-    x=  list(df['FEATURE_1'])
-    y=  list(df['FEATURE_2'])
-    plt.scatter(x, y)
+    df.plot.scatter(x='FEATURE_1',
+                      y='FEATURE_2',
+                      c='OG_CLUSTER',
+                      colormap='viridis')
     plt.show()
+
 
 #code for splitting data into training & testing based on ID
 def test_set_check(identifier, test_ratio):

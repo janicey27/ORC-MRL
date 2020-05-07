@@ -240,6 +240,7 @@ def splitter(df,  # pandas dataFrame
     for i in range(it):
         cont = False
         c, a = findContradiction(df_new, th)
+        print('Iteration',i+1, '| #Clusters=',nc+1, '------------------------')
         if c != -1:
             if OutputFlag == 1:
                 print(df_new.groupby(
@@ -248,13 +249,13 @@ def splitter(df,  # pandas dataFrame
             a, b = contradiction(df_new, c, a)
             
             if OutputFlag == 1:
-                print(c, a, b)
+                print('Cluster splitted', c,'| Action causing contradiction:', a, '| Cluster most elements went to:', b)
             df_new = split(df_new, c, a, b, pfeatures, nc, classification)
             model = predict_cluster(df_new, pfeatures)
             print('training value error:', training_value_error(df_new))
             print('testing value error:', testing_value_error(df_test, df_new, model, pfeatures))
-            print('training accuracy:', training_accuracy(df_new))
-            print('predictions:', get_predictions(df_new))
+            print('training accuracy:', training_accuracy(df_new)[0])
+#            print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
             nc += 1
