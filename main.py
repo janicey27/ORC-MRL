@@ -32,16 +32,16 @@ m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.03, 0], [0, 0.03]]
-N = 100
+sigma = [[0.1, 0], [0, 0.1]]
+N = 300
 T = 5
 clustering = ''
 n_clusters = 3
 random_state = 0
 k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 16
-th = int(0.1*N*(T-1)/n)
+n_iter = 5
+th = 0 #int(0.1*N*(T-1)/n)
 ratio = 0.2 # portion of data to be used for testing
 #################################################################
 
@@ -53,7 +53,7 @@ P, R = Generate_random_MDP(n,
                            reward_dep_action=reward_dep_action,
                            deterministic=deterministic)
 
-for i in range(n-3):
+for i in range(n-2):
     R[i] = 0
 R[n-2] = 1
 R[n-1] = -1
@@ -105,6 +105,7 @@ df_new = splitter(df,
                   pfeatures,
                   k,
                   th,
+                  df_test,
                   classification,
                   n_iter)
 
@@ -112,9 +113,12 @@ df_new = splitter(df,
 
 print(Purity(df_new))
 #plot_features(df)
-#
+model = predict_cluster(df_new, pfeatures)
+
 print('training accuracy:',training_accuracy(df_new)[0])
 print('training error:', training_value_error(df_new))
-print('testing error:', testing_value_error(df_test, df_new, pfeatures))
+print('testing error:', testing_value_error(df_test, df_new, model, pfeatures))
+print('training R2:', R2_value_training(df_new))
+print('testing R2:', R2_value_testing(df_test, df_new, model, pfeatures))
 
 #print('Training R2:', R2_value(df_new,N))

@@ -23,6 +23,7 @@ from sklearn.ensemble import RandomForestClassifier
 from collections import Counter
 from itertools import groupby
 from operator import itemgetter
+from testing import *
 #################################################################
 
 
@@ -229,6 +230,7 @@ def splitter(df,  # pandas dataFrame
              pfeatures,  # integer: number of features
              k,  # integer: indexer
              th, # integer: threshold for minimum split
+             df_test,
              classification='LogisticRegression',  # string: classification alg
              it=6,
              OutputFlag = 1):  # integer: max number of iterations
@@ -248,6 +250,11 @@ def splitter(df,  # pandas dataFrame
             if OutputFlag == 1:
                 print(c, a, b)
             df_new = split(df_new, c, a, b, pfeatures, nc, classification)
+            model = predict_cluster(df_new, pfeatures)
+            print('training value error:', training_value_error(df_new))
+            print('testing value error:', testing_value_error(df_test, df_new, model, pfeatures))
+            print('training accuracy:', training_accuracy(df_new))
+            print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
             nc += 1
