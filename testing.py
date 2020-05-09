@@ -37,6 +37,10 @@ def training_accuracy(df_new):
     accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
     return (tr_accuracy,accuracy_df)
 
+#Returns the testing accuracy of 
+def testing_accuracy(df_test, df_new):
+    pass
+
 #Get estimated MDP from clustering: for a given cluster s and action a, the next 
 # cluster is the one we go most to in the data when being in s and taking a
 def get_MDP(df_new):
@@ -224,10 +228,10 @@ def R2_value_training(df_new):
             t += 1
         E_v = E_v + (v_true-v_estim)**2
     E_v = E_v/N
-    print('new E_v', E_v)
+    #print('new E_v', E_v)
     V_true = np.array(V_true)
     v_mean = V_true.mean()
-    print('new v_mean', v_mean)
+    #print('new v_mean', v_mean)
     SS_tot = sum((V_true-v_mean)**2)/N
     return 1- E_v/SS_tot
 

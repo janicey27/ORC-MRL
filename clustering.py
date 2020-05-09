@@ -13,6 +13,7 @@ Created on Sun Mar  1 18:48:20 2020
 # Load Libraries
 import pandas as pd
 import numpy as np
+import matplotlib as plt
 from copy import deepcopy
 from sklearn.cluster import KMeans, AgglomerativeClustering, Birch
 from sklearn.preprocessing import LabelEncoder
@@ -234,7 +235,9 @@ def splitter(df,  # pandas dataFrame
              classification='LogisticRegression',  # string: classification alg
              it=6,
              OutputFlag = 1):  # integer: max number of iterations
-
+    training_R2 = []
+    testing_R2 = []
+    training_acc = []
     nc = k
     df_new = deepcopy(df)
     for i in range(it):
@@ -252,9 +255,16 @@ def splitter(df,  # pandas dataFrame
                 print('Cluster splitted', c,'| Action causing contradiction:', a, '| Cluster most elements went to:', b)
             df_new = split(df_new, c, a, b, pfeatures, nc, classification)
             model = predict_cluster(df_new, pfeatures)
-            print('training value error:', training_value_error(df_new))
-            print('testing value error:', testing_value_error(df_test, df_new, model, pfeatures))
-            print('training accuracy:', training_accuracy(df_new)[0])
+            R2_train = R2_value_training(df_new)
+            R2_test = R2_value_testing(df_test, df_new, model, pfeatures)
+            train_acc = training_accuracy(df_new)[0]
+            training_R2.append(R2_train)
+            testing_R2.append(R2_test)
+            training_acc.append(train_acc)
+            
+            print('training value R2:', R2_train)
+            print('testing value R2:', R2_test)
+            print('training accuracy:', train_acc)
 #            print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
@@ -263,7 +273,17 @@ def splitter(df,  # pandas dataFrame
             break
     if OutputFlag == 1:
         print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
-
+    
+    its = list(range(len(training_R2)))
+    plt.plot(its, training_R2, label= "Training R2")
+    plt.plot(its, testing_R2, label = "Testing R2")
+    plt.plot(its, training_acc, label = "Training Accuracy")
+    plt.xlabel('Iterations')
+    plt.ylabel('R2')
+    plt.title('R2 and Accuracy During Splitting')
+    plt.legend()
+    plt.show()
+    
     return(df_new)
 
 #################################################################
