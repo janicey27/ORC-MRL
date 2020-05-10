@@ -238,6 +238,7 @@ def splitter(df,  # pandas dataFrame
     training_R2 = []
     testing_R2 = []
     training_acc = []
+    testing_acc = []
     nc = k
     df_new = deepcopy(df)
     for i in range(it):
@@ -258,13 +259,16 @@ def splitter(df,  # pandas dataFrame
             R2_train = R2_value_training(df_new)
             R2_test = R2_value_testing(df_test, df_new, model, pfeatures)
             train_acc = training_accuracy(df_new)[0]
+            test_acc = testing_accuracy(df_test, df_new, model, pfeatures)[0]
             training_R2.append(R2_train)
             testing_R2.append(R2_test)
             training_acc.append(train_acc)
+            testing_acc.append(test_acc)
             
             print('training value R2:', R2_train)
             print('testing value R2:', R2_test)
             print('training accuracy:', train_acc)
+            print('testing accuracy:', test_acc)
 #            print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
@@ -278,8 +282,9 @@ def splitter(df,  # pandas dataFrame
     plt.plot(its, training_R2, label= "Training R2")
     plt.plot(its, testing_R2, label = "Testing R2")
     plt.plot(its, training_acc, label = "Training Accuracy")
+    plt.plot(its, testing_acc, label = "Testing Accuracy")
     plt.xlabel('Iterations')
-    plt.ylabel('R2')
+    plt.ylabel('R2 or Accuracy %')
     plt.title('R2 and Accuracy During Splitting')
     plt.legend()
     plt.show()

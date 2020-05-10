@@ -32,8 +32,8 @@ m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.3, 0], [0, 0.3]]
-N = 500
+sigma = [[0.1, 0], [0, 0.1]]
+N = 100
 T = 10
 clustering = ''
 n_clusters = 3
@@ -108,7 +108,7 @@ df_new = splitter(df,
                   df_test,
                   classification,
                   n_iter,
-                  OutputFlag = 0)
+                  OutputFlag = 1)
 
 #################################################################
 

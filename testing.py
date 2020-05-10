@@ -26,6 +26,7 @@ def get_predictions(df_new):
 #Returns the global training accuracy and a df of training accuracy per OG_CLUSTER
 def training_accuracy(df_new):
     clusters = get_predictions(df_new)
+    print('Clusters', clusters)
     #First term is what the algo predicts for each training data points, sets 
     #term is what is the truth
     accuracy = clusters.loc[df_new['CLUSTER']].reset_index()['OG_CLUSTER'] == df_new.reset_index()['OG_CLUSTER']
@@ -38,8 +39,21 @@ def training_accuracy(df_new):
     return (tr_accuracy,accuracy_df)
 
 #Returns the testing accuracy of 
-def testing_accuracy(df_test, df_new):
-    pass
+def testing_accuracy(df_test, df_new, model, pfeatures):
+    clusters = get_predictions(df_new)
+    
+    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
+    df_test['CLUSTER'] = test_clusters
+    
+    accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] == df_test.reset_index()['OG_CLUSTER']
+    #print(accuracy)
+    #accuracy = clusters.loc[df_new['CLUSTER'] == df_new['OG_CLUSTER']]
+    tr_accuracy = accuracy.mean()
+    accuracy_df = accuracy.to_frame('Accuracy')
+    accuracy_df['OG_CLUSTER'] = df_test.reset_index()['OG_CLUSTER']
+    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
+    return (tr_accuracy,accuracy_df)
+    
 
 #Get estimated MDP from clustering: for a given cluster s and action a, the next 
 # cluster is the one we go most to in the data when being in s and taking a
