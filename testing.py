@@ -1,19 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-This file is intended in getting several test measure on the output of the algorithm
+This file is intended to perform various testing measurements on the output of 
+
+the MDP Clustering Algorithm. 
+
 Created on Sun Apr 26 23:13:09 2020
 
 @author: Amine
 """
+#################################################################
+# Load Libraries
 
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import binascii
 from sklearn.tree import DecisionTreeClassifier
+#################################################################
 
-#maps each OG_ClUSTER to a cluster --> We map a cluster to the OG_CLUSTER most 
-#present in it
+
+#################################################################
+# Functions for Predictions
+
+# get_predictions() takes in a clustered dataframe df_new, and maps each 
+# CLUSTER to an OG_CLUSTER that has the most elements
+# Returns a dataframe of the mappings
 def get_predictions(df_new):
     df0 = df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count()
     df0 = df0.groupby('CLUSTER').idxmax()
@@ -22,54 +32,23 @@ def get_predictions(df_new):
     return df2
 
 
+# predict_cluster() takes in a clustered dataframe df_new, the number of 
+# features pfeatures, and returns a prediction model m that predicts the most
+# likely cluster from a datapoint's
+def predict_cluster(df_new, # dataframe: trained clusters
+                    pfeatures): # int: # of features
+    X = df_new.iloc[:, 2:2+pfeatures]
+    y = df_new['CLUSTER']
+    m = DecisionTreeClassifier()
+    m.fit(X, y)
+    return m
 
-#Returns the global training accuracy and a df of training accuracy per OG_CLUSTER
-def training_accuracy(df_new):
-    clusters = get_predictions(df_new)
-    print('Clusters', clusters)
-    #First term is what the algo predicts for each training data points, sets 
-    #term is what is the truth
-    accuracy = clusters.loc[df_new['CLUSTER']].reset_index()['OG_CLUSTER'] == df_new.reset_index()['OG_CLUSTER']
-    #print(accuracy)
-    #accuracy = clusters.loc[df_new['CLUSTER'] == df_new['OG_CLUSTER']]
-    tr_accuracy = accuracy.mean()
-    accuracy_df = accuracy.to_frame('Accuracy')
-    accuracy_df['OG_CLUSTER'] = df_new.reset_index()['OG_CLUSTER']
-    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
-    return (tr_accuracy,accuracy_df)
 
-#Returns the testing accuracy of 
-def testing_accuracy(df_test, df_new, model, pfeatures):
-    clusters = get_predictions(df_new)
-    
-    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
-    df_test['CLUSTER'] = test_clusters
-    
-    accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] == df_test.reset_index()['OG_CLUSTER']
-    #print(accuracy)
-    #accuracy = clusters.loc[df_new['CLUSTER'] == df_new['OG_CLUSTER']]
-    tr_accuracy = accuracy.mean()
-    accuracy_df = accuracy.to_frame('Accuracy')
-    accuracy_df['OG_CLUSTER'] = df_test.reset_index()['OG_CLUSTER']
-    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
-    return (tr_accuracy,accuracy_df)
-    
-
-#Get estimated MDP from clustering: for a given cluster s and action a, the next 
-# cluster is the one we go most to in the data when being in s and taking a
-def get_MDP(df_new):
-    #removing None values when counting where clusteres go
-    df0 = df_new[df_new['NEXT_CLUSTER']!='None']
-    transition_df = df0.groupby(['CLUSTER','ACTION','NEXT_CLUSTER'])['FEATURE_1'].count()
-    #taking the target cluster where we went the most
-    transition_df = transition_df.groupby(['CLUSTER','ACTION']).idxmax()
-    P_df = pd.DataFrame()
-    P_df['NEXT_CLUSTER'] = transition_df.apply(lambda x: x[2])
-    R_df = df_new.groupby('CLUSTER')['RISK'].mean()
-    return P_df,R_df
-
-#predicts value given a cluster and actions
-def predict_value_of_cluster(P_df,R_df,cluster,actions):
+# predict_value_of_cluster() takes in MDP parameters, a cluster label, and 
+# and a list of actions, and returns the predicted value of the given cluster
+def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
+                             cluster, # int: cluster number
+                             actions): # list: list of actions
     s = cluster
     v = R_df.loc[s]
     for a in actions:
@@ -77,42 +56,111 @@ def predict_value_of_cluster(P_df,R_df,cluster,actions):
         v = v + R_df.loc[s]
     return v
 
-#Compute E((\hat{v}-v)^2) ie the expect error in estimating the value given actions
-#NEED TO CHANGE: must adapt to case where T is diffrent from one simulation to another.
-# add Ids of simulations
+
+# get_MDP() takes in a clustered dataframe df_new, and returns dataframes  
+# P_df and R_df that represent the parameters of the estimated MDP
+def get_MDP(df_new):
+    # removing None values when counting where clusters go
+    df0 = df_new[df_new['NEXT_CLUSTER']!='None']
+    transition_df = df0.groupby(['CLUSTER','ACTION','NEXT_CLUSTER'])['FEATURE_1'].count()
+
+    # next cluster given how most datapionts transition for the given action
+    transition_df = transition_df.groupby(['CLUSTER','ACTION']).idxmax()
+    P_df = pd.DataFrame()
+    P_df['NEXT_CLUSTER'] = transition_df.apply(lambda x: x[2])
+    R_df = df_new.groupby('CLUSTER')['RISK'].mean()
+    return P_df,R_df
+#################################################################
+    
+
+#################################################################
+# Functions for Accuracy and Purity
+    
+# training_accuracy() takes in a clustered dataframe df_new, and returns the 
+# average training accuracy of all clusters (float) and a dataframe of 
+# training accuracies for each OG_CLUSTER
+def training_accuracy(df_new):
+    clusters = get_predictions(df_new)
+    print('Clusters', clusters)
+    
+    # Tallies datapoints where the algorithm correctly classified a datapoint's
+    # original cluster to be the OG_CLUSTER mapping of its current cluster
+    accuracy = clusters.loc[df_new['CLUSTER']].reset_index()['OG_CLUSTER'] \
+                                        == df_new.reset_index()['OG_CLUSTER']
+    #print(accuracy)
+    tr_accuracy = accuracy.mean()
+    accuracy_df = accuracy.to_frame('Accuracy')
+    accuracy_df['OG_CLUSTER'] = df_new.reset_index()['OG_CLUSTER']
+    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
+    return (tr_accuracy, accuracy_df)
+
+
+# testing_accuracy() takes in a testing dataframe df_test (unclustered), 
+# a df_new clustered dataset, a model from predict_cluster and 
+# Returns a float for the testing accuracy measuring how well the model places
+# testing data into the right cluster (mapped from OG_CLUSTER), and 
+# also returns a dataframe that has testing accuracies for each OG_CLUSTER
+def testing_accuracy(df_test, # dataframe: testing data
+                     df_new, # dataframe: clustered on training data
+                     model, # function: output of predict_cluster
+                     pfeatures): # int: # of features
+    
+    clusters = get_predictions(df_new)
+    
+    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
+    df_test['CLUSTER'] = test_clusters
+    
+    accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] \
+                                        == df_test.reset_index()['OG_CLUSTER']
+    #print(accuracy)
+    tr_accuracy = accuracy.mean()
+    accuracy_df = accuracy.to_frame('Accuracy')
+    accuracy_df['OG_CLUSTER'] = df_test.reset_index()['OG_CLUSTER']
+    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
+    return (tr_accuracy, accuracy_df)
+
+
+# purity() takes a clustered dataframe and returns a dataframe with the purity 
+# of each cluster
+def purity(df):
+    su = pd.DataFrame(df.groupby(['CLUSTER'])['OG_CLUSTER']
+    .value_counts(normalize=True)).reset_index(level=0)
+    su.columns= ['CLUSTER','Purity']
+    return su.groupby('CLUSTER')['Purity'].max()
+#################################################################
+    
+
+#################################################################
+# Functions for Error 
+
+# training_value_error() takes in a clustered dataframe, and computes the 
+# E((\hat{v}-v)^2) expected error in estimating values (risk) given actions
+# Returns a float of average value error per ID 
 def training_value_error(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
     df2 = df_new.reset_index()
     df2 = df2.groupby(['ID']).first()
-   # print(df2)
     N = df2.shape[0]
-    #print(df2)
-    #print(df_new)
+
     for i in range(N):
+        # initializing first state for each ID
         s = df2['CLUSTER'].iloc[i]
         a = df2['ACTION'].iloc[i]
         v_true = df2['RISK'].iloc[i]
-        #print('s, a, r', s, a, v_true)
         v_estim = R_df.loc[s]
         index = df2['index'].iloc[i]
-        #print('index', index, index.dtype)
-        #index = int(index)
         cont = True
         t = 1
+        # predicting path of each ID
         while cont:
-            #print('index', index, 't', t)
-            #print('next risk', df_new['RISK'].loc[index + t])
             v_true = v_true + df_new['RISK'].loc[index + t]
-            #print('new v_true', v_true)
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_new['ACTION'].loc[index + t]
-            #print('new action', a, ' \n')
-            #print('next estimated risk', R_df.loc[s])
             v_estim = v_estim + R_df.loc[s]
             try: 
                 df_new['ID'].loc[index+t+1]
@@ -121,36 +169,14 @@ def training_value_error(df_new):
             if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
                 break
             t += 1
-        #print('true vs estimate', v_true, v_estim)
-        E_v = E_v + (v_true-v_estim)**2
-    return (E_v/N)
-#    return np.sqrt((E_v/N))/(R_df.max()*T)
-
-def training_value_error_old(df_new,N,T):
-    E_v = 0
-    P_df,R_df = get_MDP(df_new)
-    for i in range(N):
-        s = df_new['CLUSTER'].loc[i*T]
-        a = df_new['ACTION'].loc[i*T]
-        v_true = df_new['RISK'].loc[i*T]
-        #print('s, a, v_true', s, a, v_true)
-        v_estim = R_df.loc[s]
-        for t in range(1,T):
-            v_true = v_true + df_new['RISK'].loc[i*T+t]
-            #print('new v_true', v_true)
-            try:
-                s = P_df.loc[s,a].values[0]
-            # error raises in case we never saw a given transition in the data
-            except TypeError:
-                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
-            a = df_new['ACTION'].loc[i*T+t]
-            #print('new action', a)
-            v_estim = v_estim + R_df.loc[s]
         E_v = E_v + (v_true-v_estim)**2
     return (E_v/N)
 
-# takes in a dataframe of testing data, and dataframe of new clustered data
-# predicts initial cluster, and then run analysis on v_predict and v_true
+
+# testing_value_error() takes in a dataframe of testing data, and dataframe of 
+# new clustered data, a model from predict_cluster function, and computes the
+# expected value error given actions and a predicted initial cluster
+# Returns a float of average value error per ID
 def testing_value_error(df_test, df_new, model, pfeatures):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
@@ -158,32 +184,31 @@ def testing_value_error(df_test, df_new, model, pfeatures):
     df2 = df2.groupby(['ID']).first()
     N = df2.shape[0]
     
+    # predicts clusterings based on model
     clusters = model.predict(df2.iloc[:, 2:2+pfeatures])
-    df2['CLUSTER'] = clusters
-    #print(df2)
+    df2['CLUSTER'] = clusters 
+    
     for i in range (N):
+        # initialize starting cluster
         s = df2['CLUSTER'].iloc[i]
         a = df2['ACTION'].iloc[i]
         v_true = df2['RISK'].iloc[i]
-        #print('s, a, r', s, a, v_true)
         v_estim = R_df.loc[s]
         index = df2['index'].iloc[i]
         cont = True
         t = 1
+        # predicting path of each ID
         while cont:
-            #print('index', index, 't', t)
-            #print('next risk', df_test['RISK'].loc[index + t])
             v_true = v_true + df_test['RISK'].loc[index + t]
-            #print('new v_true', v_true)
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
-                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+                print('WARNING: Trying to predict next state from state',s,
+                      'taking action',a,', but this transition is never seen \
+                      in the data. Data point:',i,t)
             a = df_test['ACTION'].loc[index + t]
-            #print('new action', a, ' \n')
             v_estim = v_estim + R_df.loc[s]
-            #print('next estimated risk', R_df.loc[s])
             try: 
                 df_test['ID'].loc[index+t+1]
             except:
@@ -191,20 +216,16 @@ def testing_value_error(df_test, df_new, model, pfeatures):
             if df_test['ID'].loc[index+t] != df_test['ID'].loc[index+t+1]:
                 break
             t += 1
-        #print('true vs estimate', v_true, v_estim)
         E_v = E_v + (v_true-v_estim)**2
     return (E_v/N)
-
-# function that takes df_new and pfeatures, and returns a prediction model m
-def predict_cluster(df_new, pfeatures):
-    X = df_new.iloc[:, 2:2+pfeatures]
-    y = df_new['CLUSTER']
-    m = DecisionTreeClassifier()
-    m.fit(X, y)
-    return m
+#################################################################
     
 
+#################################################################
+# Functions for R2 Values
 
+# R2_value_training() takes in a clustered dataframe, and returns a float 
+# of the R-squared value between the expected value and true value of samples
 def R2_value_training(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
@@ -213,6 +234,7 @@ def R2_value_training(df_new):
     N = df2.shape[0]
     V_true = []
     for i in range(N):
+        # initializing starting cluster and values
         s = df2['CLUSTER'].iloc[i]
         a = df2['ACTION'].iloc[i]
         v_true = df2['RISK'].iloc[i]
@@ -221,6 +243,7 @@ def R2_value_training(df_new):
         index = df2['index'].iloc[i]
         cont = True
         t = 1
+        # iterating through path of ID
         while cont:
             v_true = v_true + df_new['RISK'].loc[index + t]
             V_true.append(v_true)
@@ -231,7 +254,6 @@ def R2_value_training(df_new):
             except TypeError:
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_new['ACTION'].loc[index + t]
-
             v_estim = v_estim + R_df.loc[s]
             try: 
                 df_new['ID'].loc[index+t+1]
@@ -241,14 +263,17 @@ def R2_value_training(df_new):
                 break
             t += 1
         E_v = E_v + (v_true-v_estim)**2
+    # defining R2 baseline & calculating the value
     E_v = E_v/N
-    #print('new E_v', E_v)
     V_true = np.array(V_true)
     v_mean = V_true.mean()
-    #print('new v_mean', v_mean)
     SS_tot = sum((V_true-v_mean)**2)/N
     return 1- E_v/SS_tot
 
+
+# R2_value_testing() takes a dataframe of testing data, a clustered dataframe, 
+# a model outputted by predict_cluster, and returns a float of the R-squared
+# value between the expected value and true value of samples in the test set
 def R2_value_testing(df_test, df_new, model, pfeatures):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
@@ -256,6 +281,7 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
     df2 = df2.groupby(['ID']).first()
     N = df2.shape[0]
     
+    # predicting clusters based on features
     clusters = model.predict(df2.iloc[:, 2:2+pfeatures])
     df2['CLUSTER'] = clusters
     
@@ -290,67 +316,27 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
             t += 1
         E_v = E_v + (v_true-v_estim)**2
     E_v = E_v/N
-    #print('new E_v', E_v)
     V_true = np.array(V_true)
     v_mean = V_true.mean()
-    #print('new v_mean', v_mean)
     SS_tot = sum((V_true-v_mean)**2)/N
     return 1- E_v/SS_tot
+#################################################################
+
+
+#################################################################
+# Functions for Plotting
     
-
-#Computes the R square of value prediction
-def R2_value_old(df_new,N,T):
-    P_df,R_df = get_MDP(df_new)
-    E_v = 0
-    V_true = []
-    for i in range(N):
-        s = df_new['CLUSTER'].loc[i*T]
-        a = df_new['ACTION'].loc[i*T]
-        v_true = df_new['RISK'].loc[i*T]
-        V_true.append(v_true)
-        v_estim = R_df.loc[s]
-        for t in range(1,T):
-            v_true = v_true + df_new['RISK'].loc[i*T+t]
-            V_true.append(v_true)
-            try:
-                s = P_df.loc[s,a].values[0]
-            # error raises in case we never saw a given transition in the data
-            except TypeError:
-                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
-            a = df_new['ACTION'].loc[i*T+t]
-            v_estim = v_estim + R_df.loc[s]
-        E_v = E_v + (v_true-v_estim)**2
-    E_v = E_v/N
-    print('new E_v', E_v)
-    V_true = np.array(V_true)
-    v_mean = V_true.mean()
-    print('new v_mean', v_mean)
-    SS_tot = sum((V_true-v_mean)**2)/N
-    return 1- E_v/SS_tot
-# Returns the purity of each cluster
-def Purity(df):
-    su = pd.DataFrame(df.groupby(['CLUSTER'])['OG_CLUSTER']
-    .value_counts(normalize=True)).reset_index(level=0)
-    su.columns= ['CLUSTER','Purity']
-    return su.groupby('CLUSTER')['Purity'].max()
-
-
-
+# plot_features() takes in a dataframe of two features, and plots the data
+# to illustrate the noise in each original cluster
 def plot_features(df):
     df.plot.scatter(x='FEATURE_1',
                       y='FEATURE_2',
                       c='OG_CLUSTER',
                       colormap='viridis')
     plt.show()
+#################################################################
+    
 
+#################################################################
 
-#code for splitting data into training & testing based on ID
-def test_set_check(identifier, test_ratio):
-    return binascii.crc32(np.int64(identifier)) & 0xffffffff < test_ratio * 2**32
-
-#returns Testing and Training dataset
-def split_train_test_by_id(data, test_ratio, id_column):
-    ids = data[id_column]
-    in_test_set = ids.apply(lambda id_: test_set_check(id_, test_ratio))
-    return data.loc[~in_test_set], data.loc[in_test_set]
 
