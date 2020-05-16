@@ -254,7 +254,8 @@ def splitter(df,  # pandas dataFrame
              df_test,
              classification='LogisticRegression',  # string: classification alg
              it=6,
-             OutputFlag = 1):  # integer: max number of iterations
+             OutputFlag = 1,
+             n=-1):  # integer: max number of iterations
     # initializing lists for error & accuracy data
     training_R2 = []
     testing_R2 = []
@@ -297,12 +298,12 @@ def splitter(df,  # pandas dataFrame
             training_error.append(train_error)
             
             # printing error and accuracy values
-            #print('training value R2:', R2_train)
-            #print('testing value R2:', R2_test)
+            print('training value R2:', R2_train)
+            print('testing value R2:', R2_test)
             print('training accuracy:', train_acc)
             print('testing accuracy:', test_acc)
-            print('training error:', train_error)
-            print('testing error:', test_error)
+            print('training value error:', train_error)
+            print('testing value error:', test_error)
             #print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
@@ -312,18 +313,33 @@ def splitter(df,  # pandas dataFrame
     if OutputFlag == 1:
         print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
     
+    
     # plotting functions
+    ## Plotting accuracy and value R2
+    fig1, ax1 = plt.subplots()
     its = np.arange(k+1, nc+1)
-    #plt.plot(its, training_R2, label= "Training R2")
-    #plt.plot(its, testing_R2, label = "Testing R2")
-    #plt.plot(its, training_acc, label = "Training Accuracy")
-    #plt.plot(its, testing_acc, label = "Testing Accuracy")
-    plt.plot(its, training_error, label = "Training Error")
-    plt.plot(its, testing_error, label = "Testing Error")
-    plt.xlabel('# of Clusters')
-    plt.ylabel('R2 or Accuracy %')
-    plt.title('R2 and Accuracy During Splitting')
-    plt.legend()
+    ax1.plot(its, training_R2, label= "Training R2")
+    ax1.plot(its, testing_R2, label = "Testing R2")
+    ax1.plot(its, training_acc, label = "Training Accuracy")
+    ax1.plot(its, testing_acc, label = "Testing Accuracy")
+    if n>0:
+        ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+    ax1.set_ylim(0,1)
+    ax1.set_xlabel('# of Clusters')
+    ax1.set_ylabel('R2 or Accuracy %')
+    ax1.set_title('R2 and Accuracy During Splitting')
+    ax1.legend()
+    ## Plotting value error E((v_est - v_true)^2)
+    fig2, ax2 = plt.subplots()
+    ax2.plot(its, training_error, label = "Training Error")
+    ax2.plot(its, testing_error, label = "Testing Error")
+    if n>0:
+        ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+    ax2.set_ylim(0)
+    ax2.set_xlabel('# of Clusters')
+    ax2.set_ylabel('Value error')
+    ax2.set_title('Value error by number of clusters')
+    ax2.legend()
     plt.show()
     
     return(df_new)

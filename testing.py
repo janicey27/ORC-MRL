@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV
 #################################################################
 
 
@@ -39,7 +40,16 @@ def predict_cluster(df_new, # dataframe: trained clusters
                     pfeatures): # int: # of features
     X = df_new.iloc[:, 2:2+pfeatures]
     y = df_new['CLUSTER']
+    
+    params = {
+    'max_depth': [3, 5, 10, None],
+    }
+
     m = DecisionTreeClassifier()
+    
+    m = GridSearchCV(m, params)
+
+#    m = DecisionTreeClassifier(max_depth = 10)
     m.fit(X, y)
     return m
 
@@ -81,7 +91,7 @@ def get_MDP(df_new):
 # training accuracies for each OG_CLUSTER
 def training_accuracy(df_new):
     clusters = get_predictions(df_new)
-    print('Clusters', clusters)
+#    print('Clusters', clusters)
     
     # Tallies datapoints where the algorithm correctly classified a datapoint's
     # original cluster to be the OG_CLUSTER mapping of its current cluster
@@ -141,9 +151,9 @@ def training_value_error(df_new):
     P_df,R_df = get_MDP(df_new)
     df2 = df_new.reset_index()
     df2 = df2.groupby(['ID']).first()
-    N = df2.shape[0]
+    N_train = df2.shape[0]
 
-    for i in range(N):
+    for i in range(N_train):
         # initializing first state for each ID
         s = df2['CLUSTER'].iloc[i]
         a = df2['ACTION'].iloc[i]
@@ -170,7 +180,7 @@ def training_value_error(df_new):
                 break
             t += 1
         E_v = E_v + (v_true-v_estim)**2
-    return (E_v/N)
+    return (E_v/N_train)
 
 
 # testing_value_error() takes in a dataframe of testing data, and dataframe of 
@@ -238,7 +248,7 @@ def R2_value_training(df_new):
         s = df2['CLUSTER'].iloc[i]
         a = df2['ACTION'].iloc[i]
         v_true = df2['RISK'].iloc[i]
-        V_true.append(v_true)
+
         v_estim = R_df.loc[s]
         index = df2['index'].iloc[i]
         cont = True
@@ -246,7 +256,6 @@ def R2_value_training(df_new):
         # iterating through path of ID
         while cont:
             v_true = v_true + df_new['RISK'].loc[index + t]
-            V_true.append(v_true)
 
             try:
                 s = P_df.loc[s,a].values[0]
@@ -263,12 +272,13 @@ def R2_value_training(df_new):
                 break
             t += 1
         E_v = E_v + (v_true-v_estim)**2
+        V_true.append(v_true)
     # defining R2 baseline & calculating the value
     E_v = E_v/N
     V_true = np.array(V_true)
     v_mean = V_true.mean()
     SS_tot = sum((V_true-v_mean)**2)/N
-    return 1- E_v/SS_tot
+    return max(1- E_v/SS_tot,0)
 
 
 # R2_value_testing() takes a dataframe of testing data, a clustered dataframe, 
@@ -290,14 +300,14 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
         s = df2['CLUSTER'].iloc[i]
         a = df2['ACTION'].iloc[i]
         v_true = df2['RISK'].iloc[i]
-        V_true.append(v_true)
+
         v_estim = R_df.loc[s]
         index = df2['index'].iloc[i]
         cont = True
         t = 1
         while cont:
             v_true = v_true + df_test['RISK'].loc[index + t]
-            V_true.append(v_true)
+            
 
             try:
                 s = P_df.loc[s,a].values[0]
@@ -315,11 +325,12 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
                 break
             t += 1
         E_v = E_v + (v_true-v_estim)**2
+        V_true.append(v_true)
     E_v = E_v/N
     V_true = np.array(V_true)
     v_mean = V_true.mean()
     SS_tot = sum((V_true-v_mean)**2)/N
-    return 1- E_v/SS_tot
+    return max(1- E_v/SS_tot,0)
 #################################################################
 
 
@@ -333,6 +344,8 @@ def plot_features(df):
                       y='FEATURE_2',
                       c='OG_CLUSTER',
                       colormap='viridis')
+#    import seaborn as sns
+#    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
     plt.show()
 #################################################################
     

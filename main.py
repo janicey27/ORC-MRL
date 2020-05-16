@@ -28,22 +28,22 @@ from testing import *
 
 #################################################################
 # Set Parameters
-n = 10
-m = 3
+n = 20
+m = 5
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.05, 0], [0, 0.05]]
-N = 1000
+sigma = [[0.08, 0], [0, 0.08]]
+N = 600
 T = 5
 clustering = ''
 n_clusters = 6
 random_state = 0
 k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 20
+n_iter = 30
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
-ratio = 0.2 # portion of data to be used for testing
+ratio = 0.3 # portion of data to be used for testing
 #################################################################
 
 
@@ -55,8 +55,10 @@ P, R = Generate_random_MDP(n,
                            deterministic=deterministic)
 
 for i in range(n):
-    R[i] = i%6*0.1
+    R[i] = i%6*0.2
     
+    
+n_clusters = len(np.unique(R))
 # Updates the correct k automatically for initial clustering based on Risk
 if all(clustering != i for i in ['KMeans', 'Agglomerative', 'Birch']):
     k = len(np.unique(np.array(R)))
@@ -107,7 +109,8 @@ df_new = splitter(df,
                   df_test,
                   classification,
                   n_iter,
-                  OutputFlag = 1)
+                  OutputFlag = 0,
+                  n=n)
 
 #################################################################
 
