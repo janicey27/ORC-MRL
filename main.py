@@ -14,6 +14,7 @@ Main MDP clustering algorithm running.
 from MDPtools import Generate_random_MDP, sample_MDP_with_features_list
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 #################################################################
 
 
@@ -25,6 +26,7 @@ from clustering import defaultNormal, UnifNormal, transformSamples, \
 from testing import *
 #################################################################
 
+random.seed(5)
 
 #################################################################
 # Set Parameters
@@ -33,7 +35,7 @@ m = 5
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.08, 0], [0, 0.08]]
+sigma = [[0.05, 0], [0, 0.05]]
 N = 600
 T = 5
 clustering = ''

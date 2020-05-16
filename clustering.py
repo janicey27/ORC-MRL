@@ -21,10 +21,12 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
 #from xgboost import XGBClassifier
 from collections import Counter
 from itertools import groupby
 from operator import itemgetter
+
 from testing import *
 #################################################################
 
@@ -204,6 +206,10 @@ def split(df,  # pandas dataFrame
         m = LogisticRegressionCV()
     elif classification == 'DecisionTreeClassifier':
         m = DecisionTreeClassifier()
+#        params = {
+#        'max_depth': [3, 4, 6, 10,None]
+#        }
+#        m = GridSearchCV(m, params,cv = 5)
     elif classification == 'RandomForestClassifier':
         m = RandomForestClassifier()
     #elif classification == 'XGBClassifier':

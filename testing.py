@@ -42,12 +42,12 @@ def predict_cluster(df_new, # dataframe: trained clusters
     y = df_new['CLUSTER']
     
     params = {
-    'max_depth': [3, 5, 10, None],
+    'max_depth': [3, 4, 6, 10,None]
     }
 
     m = DecisionTreeClassifier()
     
-    m = GridSearchCV(m, params)
+    m = GridSearchCV(m, params,cv = 5)
 
 #    m = DecisionTreeClassifier(max_depth = 10)
     m.fit(X, y)
