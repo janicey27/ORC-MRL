@@ -38,7 +38,7 @@ from clustering import defaultNormal, UnifNormal, transformSamples, \
 from testing import *
 #################################################################
 
-random.seed(5)
+#random.seed(1)
 
 #################################################################
 # Set Parameters
