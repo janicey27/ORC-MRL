@@ -47,7 +47,7 @@ def predict_cluster(df_new, # dataframe: trained clusters
 
     m = DecisionTreeClassifier()
     
-    m = GridSearchCV(m, params,cv = 5)
+    m = GridSearchCV(m, params,cv = 5, iid=True) #will return warning if 'idd' param not set to true
 
 #    m = DecisionTreeClassifier(max_depth = 10)
     m.fit(X, y)
