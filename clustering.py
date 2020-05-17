@@ -14,6 +14,7 @@ Created on Sun Mar  1 18:48:20 2020
 import pandas as pd
 import numpy as np
 import matplotlib as plt
+from tqdm import tqdm #progress bar
 import binascii
 from copy import deepcopy
 from sklearn.cluster import KMeans, AgglomerativeClustering, Birch
@@ -272,12 +273,18 @@ def splitter(df,  # pandas dataFrame
     nc = k
     df_new = deepcopy(df)
     
-    for i in range(it):
+    # Setting progress bar--------------
+    split_bar = tqdm(range(it))
+    split_bar.set_description("Splitting...")
+    # Setting progress bar--------------
+    for i in split_bar:
+        split_bar.set_description("Splitting... |#Clusters:%s" %(nc))
         cont = False
         c, a = findContradiction(df_new, th)
         print('Iteration',i+1, '| #Clusters=',nc+1, '------------------------')
         if c != -1:
             if OutputFlag == 1:
+                print('Cluster Content')
                 print(df_new.groupby(
                             ['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
             
@@ -304,12 +311,13 @@ def splitter(df,  # pandas dataFrame
             training_error.append(train_error)
             
             # printing error and accuracy values
-            print('training value R2:', R2_train)
-            print('testing value R2:', R2_test)
-            print('training accuracy:', train_acc)
-            print('testing accuracy:', test_acc)
-            print('training value error:', train_error)
-            print('testing value error:', test_error)
+            if OutputFlag == 1:
+                print('training value R2:', R2_train)
+                print('testing value R2:', R2_test)
+                print('training accuracy:', train_acc)
+                print('testing accuracy:', test_acc)
+                print('training value error:', train_error)
+                print('testing value error:', test_error)
             #print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
@@ -348,7 +356,75 @@ def splitter(df,  # pandas dataFrame
     ax2.legend()
     plt.show()
     
-    return(df_new)
+    return(df_new,training_R2,testing_R2)
 
 #################################################################
 
+
+
+# Splitter algorithm with cross-validation
+def fit_CV(df,
+          pfeatures,
+          k,
+          th,
+          clustering,
+          classification,
+          n_iter,
+          n_clusters,
+          random_state,
+          OutputFlag = 0,
+          n=-1,
+          cv=5):
+    
+    list_training_R2 = []
+    list_testing_R2 = []
+    data_size = df['ID'].max()
+    
+    cv_bar = tqdm(range(cv))
+    cv_bar.set_description("Cross-Validation...")
+    for i in cv_bar:
+        cv_bar.set_description("Cross-Validation... | Test set # %")
+        
+        df_test = df[(df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv)] #WARNING last datapoint not included
+        df_train = df[~((df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv))]
+        #################################################################
+        # Initialize Clusters
+        df_init = initializeClusters(df_train,
+                                clustering=clustering,
+                                n_clusters=n_clusters,
+                                random_state=random_state)
+        #################################################################
+        
+        #################################################################
+        # Run Iterative Learning Algorithm
+        
+        df_new,training_R2,testing_R2 = splitter(df_init,
+                                          pfeatures,
+                                          k,
+                                          th,
+                                          df_test,
+                                          classification,
+                                          n_iter,
+                                          OutputFlag = 0,
+                                          n=n)
+        list_training_R2.append(np.array(training_R2))
+        list_testing_R2.append(np.array(testing_R2))
+        
+    cv_training_R2 = np.mean(np.array(list_training_R2),axis=0)
+    cv_testing_R2 = np.mean(np.array(list_testing_R2),axis=0)
+    
+    fig1, ax1 = plt.subplots()
+    its = np.arange(k+1,k+1+len(cv_training_R2))
+    ax1.plot(its, cv_training_R2, label= "CV Training R2")
+    ax1.plot(its, cv_testing_R2, label = "CV Testing R2")
+#    ax1.plot(its, training_acc, label = "Training Accuracy")
+#    ax1.plot(its, testing_acc, label = "Testing Accuracy")
+    if n>0:
+        ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+    ax1.set_ylim(0,1)
+    ax1.set_xlabel('# of Clusters')
+    ax1.set_ylabel('Mean CV R2 or Accuracy %')
+    ax1.set_title('Mean CV R2 and Accuracy During Splitting')
+    ax1.legend()
+    
+    return (list_training_R2,list_testing_R2)

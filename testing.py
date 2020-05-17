@@ -169,7 +169,7 @@ def training_value_error(df_new):
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
-                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_new['ACTION'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
             try: 
@@ -214,7 +214,7 @@ def testing_value_error(df_test, df_new, model, pfeatures):
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
-                print('WARNING: Trying to predict next state from state',s,
+                print('WARNING: In testing value evaluation, trying to predict next state from state',s,
                       'taking action',a,', but this transition is never seen \
                       in the data. Data point:',i,t)
             a = df_test['ACTION'].loc[index + t]

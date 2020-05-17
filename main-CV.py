@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+"""
+Created on Sun May 17 00:29:59 2020
+
+@author: 
+    
+    
+This is same as main function, but used not for one test set but for cross-validation
+"""
+
+
+# -*- coding: utf-8 -*-
 
 """
 
@@ -22,7 +33,8 @@ import random
 # Load Libraries
 
 from clustering import defaultNormal, UnifNormal, transformSamples, \
-                        initializeClusters, splitter, split_train_test_by_id
+                        initializeClusters, splitter, split_train_test_by_id,\
+                        fit_CV
 from testing import *
 #################################################################
 
@@ -36,14 +48,14 @@ reward_dep_action = False
 deterministic = True
 pfeatures = 2
 sigma = [[0.08, 0], [0, 0.08]]
-N = 600
+N = 400
 T = 5
 clustering = ''
 n_clusters = 6
 random_state = 0
 k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 100
+n_iter = 60
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
 #################################################################
@@ -61,6 +73,7 @@ for i in range(n):
     
     
 n_clusters = len(np.unique(R))
+k = n_clusters
 # Updates the correct k automatically for initial clustering based on Risk
 if all(clustering != i for i in ['KMeans', 'Agglomerative', 'Birch']):
     k = len(np.unique(np.array(R)))
@@ -84,44 +97,24 @@ samples = sample_MDP_with_features_list(P,
                                         normal_distributions,
                                         N,
                                         T)
-#################################################################
 
-
-#################################################################
-# Transform into Training and Testing DataFrames
 df = transformSamples(samples,
                       pfeatures)
-
-df_train, df_test = split_train_test_by_id(df, ratio, 'ID')
-#################################################################
-# Initialize Clusters
-df = initializeClusters(df_train,
-                        clustering=clustering,
-                        n_clusters=n_clusters,
-                        random_state=random_state)
 #################################################################
 
-#################################################################
-# Run Iterative Learning Algorithm
 
-df_new = splitter(df,
-                  pfeatures,
-                  k,
-                  th,
-                  df_test,
-                  classification,
-                  n_iter,
-                  OutputFlag = 0,
-                  n=n)
 
 #################################################################
 
-print(purity(df_new))
-#plot_features(df)
-model = predict_cluster(df_new, pfeatures)
-
-print('training accuracy:',training_accuracy(df_new)[0])
-print('training error:', training_value_error(df_new))
-print('testing error:', testing_value_error(df_test, df_new, model, pfeatures))
-print('training R2:', R2_value_training(df_new))
-print('testing R2:', R2_value_testing(df_test, df_new, model, pfeatures))
+list_training_R2,list_testing_R2 =fit_CV(df,
+                                              pfeatures,
+                                              k,
+                                              th,
+                                              clustering,
+                                              classification,
+                                              n_iter,
+                                              n_clusters,
+                                              random_state,
+                                              OutputFlag = 0,
+                                              n=n,
+                                              cv=5)
