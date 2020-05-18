@@ -383,7 +383,7 @@ def fit_CV(df,
     cv_bar = tqdm(range(cv))
     cv_bar.set_description("Cross-Validation...")
     for i in cv_bar:
-        cv_bar.set_description("Cross-Validation... | Test set # %")
+        cv_bar.set_description("Cross-Validation... | Test set # %i" %i)
         
         df_test = df[(df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv)] #WARNING last datapoint not included
         df_train = df[~((df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv))]
