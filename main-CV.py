@@ -42,20 +42,20 @@ from testing import *
 
 #################################################################
 # Set Parameters
-n = 20
+n = 15
 m = 5
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
 sigma = [[0.04, 0], [0, 0.04]]
-N = 400
+N = 200
 T = 5
 clustering = ''
 n_clusters = 6
 random_state = 0
 k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 60
+n_iter = 30
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
 #################################################################

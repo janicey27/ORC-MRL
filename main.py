@@ -104,15 +104,15 @@ df = initializeClusters(df_train,
 #################################################################
 # Run Iterative Learning Algorithm
 
-df_new = splitter(df,
-                  pfeatures,
-                  k,
-                  th,
-                  df_test,
-                  classification,
-                  n_iter,
-                  OutputFlag = 0,
-                  n=n)
+df_new,training_R2,testing_R2 = splitter(df,
+                                  pfeatures,
+                                  k,
+                                  th,
+                                  df_test,
+                                  classification,
+                                  n_iter,
+                                  OutputFlag = 0,
+                                  n=n)
 
 #################################################################
 
