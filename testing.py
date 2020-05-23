@@ -72,7 +72,7 @@ def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
 def get_MDP(df_new):
     # removing None values when counting where clusters go
     df0 = df_new[df_new['NEXT_CLUSTER']!='None']
-    transition_df = df0.groupby(['CLUSTER','ACTION','NEXT_CLUSTER'])['FEATURE_1'].count()
+    transition_df = df0.groupby(['CLUSTER','ACTION','NEXT_CLUSTER'])['RISK'].count()
 
     # next cluster given how most datapionts transition for the given action
     transition_df = transition_df.groupby(['CLUSTER','ACTION']).idxmax()
