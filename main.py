@@ -15,6 +15,7 @@ from MDPtools import Generate_random_MDP, sample_MDP_with_features_list
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from model import MDP_model
 #################################################################
 
 
@@ -35,17 +36,18 @@ m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.05, 0], [0, 0.05]]
+sigma = [[0.2, 0], [0, 0.2]]
 N = 200
 T = 6
-clustering = ''
-n_clusters = 6
+clustering = 'Agglomerative'
+n_clusters = None # for KMeans
 random_state = 0
-k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 15
+n_iter = 10
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
+cv = 5
+distance_threshold = 0.3
 #################################################################
 
 
@@ -60,10 +62,7 @@ for i in range(n):
     R[i] = i%6*0.2
     
     
-n_clusters = len(np.unique(R))
-# Updates the correct k automatically for initial clustering based on Risk
-if all(clustering != i for i in ['KMeans', 'Agglomerative', 'Birch']):
-    k = len(np.unique(np.array(R)))
+#n_clusters = len(np.unique(R))
 #################################################################
 
 
@@ -92,6 +91,20 @@ samples = sample_MDP_with_features_list(P,
 df = transformSamples(samples,
                       pfeatures)
 
+m = MDP_model()
+m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+    pfeatures, # int: number of features
+    #h, # int: time horizon (# of actions we want to optimize)
+    n_iter, # int: number of iterations
+    distance_threshold, # clustering diameter for Agglomerative clustering
+    cv, # number for cross validation
+    th, # splitting threshold
+    classification, # classification method
+    clustering,# clustering method from Agglomerative, KMeans, and Birch
+    n_clusters, # number of clusters for KMeans
+    random_state)
+
+'''
 df_train, df_test = split_train_test_by_id(df, ratio, 'ID')
 #################################################################
 # Initialize Clusters
@@ -124,3 +137,4 @@ print('training error:', training_value_error(df_new))
 print('testing error:', testing_value_error(df_test, df_new, model, pfeatures))
 print('training R2:', R2_value_training(df_new))
 print('testing R2:', R2_value_testing(df_test, df_new, model, pfeatures))
+'''

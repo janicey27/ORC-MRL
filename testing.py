@@ -35,7 +35,7 @@ def get_predictions(df_new):
 
 # predict_cluster() takes in a clustered dataframe df_new, the number of 
 # features pfeatures, and returns a prediction model m that predicts the most
-# likely cluster from a datapoint's
+# likely cluster from a datapoint's features
 def predict_cluster(df_new, # dataframe: trained clusters
                     pfeatures): # int: # of features
     X = df_new.iloc[:, 2:2+pfeatures]
@@ -47,7 +47,7 @@ def predict_cluster(df_new, # dataframe: trained clusters
 
     m = DecisionTreeClassifier()
     
-    m = GridSearchCV(m, params,cv = 5, iid=True) #will return warning if 'idd' param not set to true
+    m = GridSearchCV(m, params,cv = 5, iid=True) #will return warning if 'iid' param not set to true
 
 #    m = DecisionTreeClassifier(max_depth = 10)
     m.fit(X, y)

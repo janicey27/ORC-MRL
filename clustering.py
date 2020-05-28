@@ -91,8 +91,9 @@ def split_train_test_by_id(data, # dataframe: all the data
 # and a random seed (optional) and returns a dataframe
 # with two new columns 'CLUSTER' and 'NEXT_CLUSTER'
 def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
-                       clustering='KMeans',  # string: clustering algorithm
-                       n_clusters=8,  # number of clusters
+                       clustering='Agglomerative',  # string: clustering algorithm
+                       n_clusters= None,
+                       distance_threshold= 0.3,# number of clusters
                        random_state=0):  # random seed for the clustering
     df = df.copy()
     if clustering == 'KMeans':
@@ -101,7 +102,7 @@ def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
                         np.array(df.RISK).reshape(-1, 1)).labels_
     elif clustering == 'Agglomerative':
         output = AgglomerativeClustering(
-            n_clusters=n_clusters).fit(
+            n_clusters=n_clusters, distance_threshold = distance_threshold).fit(
                     np.array(df.RISK).reshape(-1, 1)).labels_
     elif clustering == 'Birch':
         output = Birch(
@@ -257,11 +258,14 @@ def split(df,  # pandas dataFrame
 def splitter(df,  # pandas dataFrame
              pfeatures,  # integer: number of features
              th, # integer: threshold for minimum split
-             df_test,
+             df_test = None,
+             testing = False,
+             opt_nc = None,
              classification='LogisticRegression',  # string: classification alg
-             it=6,
+             it=6, # integer: max number of iterations
+             #h=5,
              OutputFlag = 1,
-             n=-1):  # integer: max number of iterations
+             n=-1):  
     # initializing lists for error & accuracy data
     training_R2 = []
     testing_R2 = []
@@ -297,33 +301,41 @@ def splitter(df,  # pandas dataFrame
             df_new = split(df_new, c, a, b, pfeatures, nc, classification)
             
             # error and accuracy calculations
-            model = predict_cluster(df_new, pfeatures)
+            
             R2_train = R2_value_training(df_new)
-            R2_test = R2_value_testing(df_test, df_new, model, pfeatures)
             train_acc = training_accuracy(df_new)[0]
-            test_acc = testing_accuracy(df_test, df_new, model, pfeatures)[0]
-            train_error = training_value_error(df_new)
-            test_error = testing_value_error(df_test, df_new, model, pfeatures)
-            training_R2.append(R2_train)
-            testing_R2.append(R2_test)
-            training_acc.append(train_acc)
-            testing_acc.append(test_acc)
-            testing_error.append(test_error)
+            train_error = training_value_error(df_new)            
+            training_R2.append(R2_train)            
+            training_acc.append(train_acc)                        
             training_error.append(train_error)
+            
+            if testing:
+                model = predict_cluster(df_new, pfeatures)
+                R2_test = R2_value_testing(df_test, df_new, model, pfeatures)
+                test_acc = testing_accuracy(df_test, df_new, model, pfeatures)[0]
+                test_error = testing_value_error(df_test, df_new, model, pfeatures)
+                testing_R2.append(R2_test)
+                testing_acc.append(test_acc)
+                testing_error.append(test_error)
+                
             
             # printing error and accuracy values
             if OutputFlag == 1:
                 print('training value R2:', R2_train)
-                print('testing value R2:', R2_test)
                 print('training accuracy:', train_acc)
-                print('testing accuracy:', test_acc)
                 print('training value error:', train_error)
-                print('testing value error:', test_error)
+                if testing:
+                    print('testing value R2:', R2_test)
+                    print('testing accuracy:', test_acc)
+                    print('testing value error:', test_error)
             #print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             cont = True
             nc += 1
         if not cont:
+            break
+        if nc == opt_nc:
+            print('Optimal # of clusters reached')
             break
     if OutputFlag == 1:
         print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
@@ -334,9 +346,10 @@ def splitter(df,  # pandas dataFrame
     fig1, ax1 = plt.subplots()
     its = np.arange(k+1, nc+1)
     ax1.plot(its, training_R2, label= "Training R2")
-    ax1.plot(its, testing_R2, label = "Testing R2")
     ax1.plot(its, training_acc, label = "Training Accuracy")
-    ax1.plot(its, testing_acc, label = "Testing Accuracy")
+    if testing:
+        ax1.plot(its, testing_acc, label = "Testing Accuracy")
+        ax1.plot(its, testing_R2, label = "Testing R2")
     if n>0:
         ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
     ax1.set_ylim(0,1)
@@ -347,7 +360,8 @@ def splitter(df,  # pandas dataFrame
     ## Plotting value error E((v_est - v_true)^2)
     fig2, ax2 = plt.subplots()
     ax2.plot(its, training_error, label = "Training Error")
-    ax2.plot(its, testing_error, label = "Testing Error")
+    if testing:
+        ax2.plot(its, testing_error, label = "Testing Error")
     if n>0:
         ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
     ax2.set_ylim(0)
@@ -357,7 +371,7 @@ def splitter(df,  # pandas dataFrame
     ax2.legend()
     plt.show()
     
-    return(df_new,training_R2,testing_R2)
+    return(df_new,training_error,testing_error)
 
 #################################################################
 
@@ -368,16 +382,18 @@ def fit_CV(df,
           pfeatures,
           th,
           clustering,
+          distance_threshold,
           classification,
           n_iter,
           n_clusters,
           random_state,
+          #h,
           OutputFlag = 0,
-          n=-1,
-          cv=5):
+          cv=5,
+          n=-1):
     
-    list_training_R2 = []
-    list_testing_R2 = []
+    list_training_error = []
+    list_testing_error = []
     data_size = df['ID'].max()
     
     cv_bar = tqdm(range(cv))
@@ -392,6 +408,7 @@ def fit_CV(df,
         df_init = initializeClusters(df_train,
                                 clustering=clustering,
                                 n_clusters=n_clusters,
+                                distance_threshold = distance_threshold,
                                 random_state=random_state)
         k = df_init['CLUSTER'].nunique()
         #################################################################
@@ -399,32 +416,35 @@ def fit_CV(df,
         #################################################################
         # Run Iterative Learning Algorithm
         
-        df_new,training_R2,testing_R2 = splitter(df_init,
+        df_new,training_error,testing_error = splitter(df_init,
                                           pfeatures,
                                           th,
                                           df_test,
-                                          classification,
-                                          n_iter,
+                                          testing = True,
+                                          opt_nc = None,
+                                          classification = classification,
+                                          it = n_iter,
+                                          #h, 
                                           OutputFlag = 0,
                                           n=n)
-        list_training_R2.append(np.array(training_R2))
-        list_testing_R2.append(np.array(testing_R2))
+        list_training_error.append(np.array(training_error))
+        list_testing_error.append(np.array(testing_error))
         
-    cv_training_R2 = np.mean(np.array(list_training_R2),axis=0)
-    cv_testing_R2 = np.mean(np.array(list_testing_R2),axis=0)
+    cv_training_error = np.mean(np.array(list_training_error),axis=0)
+    cv_testing_error = np.mean(np.array(list_testing_error),axis=0)
     
     fig1, ax1 = plt.subplots()
-    its = np.arange(k+1,k+1+len(cv_training_R2))
-    ax1.plot(its, cv_training_R2, label= "CV Training R2")
-    ax1.plot(its, cv_testing_R2, label = "CV Testing R2")
+    its = np.arange(k+1,k+1+len(cv_training_error))
+    ax1.plot(its, cv_training_error, label= "CV Training Error")
+    ax1.plot(its, cv_testing_error, label = "CV Testing Error")
 #    ax1.plot(its, training_acc, label = "Training Accuracy")
 #    ax1.plot(its, testing_acc, label = "Testing Accuracy")
     if n>0:
         ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
     ax1.set_ylim(0,1)
     ax1.set_xlabel('# of Clusters')
-    ax1.set_ylabel('Mean CV R2 or Accuracy %')
-    ax1.set_title('Mean CV R2 and Accuracy During Splitting')
+    ax1.set_ylabel('Mean CV Error or Accuracy %')
+    ax1.set_title('Mean CV Error and Accuracy During Splitting')
     ax1.legend()
     
-    return (list_training_R2,list_testing_R2)
+    return (list_training_error,list_testing_error, k)
