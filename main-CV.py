@@ -42,14 +42,14 @@ from testing import *
 
 #################################################################
 # Set Parameters
-n = 15
-m = 5
+n = 10
+m = 2
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
 sigma = [[0.04, 0], [0, 0.04]]
-N = 200
-T = 5
+N = 2000
+T = 50
 clustering = ''
 n_clusters = 6
 random_state = 0
@@ -106,15 +106,14 @@ df = transformSamples(samples,
 
 #################################################################
 
-list_training_R2,list_testing_R2 =fit_CV(df,
-                                              pfeatures,
-                                              k,
-                                              th,
-                                              clustering,
-                                              classification,
-                                              n_iter,
-                                              n_clusters,
-                                              random_state,
-                                              OutputFlag = 0,
-                                              n=n,
-                                              cv=5)
+#list_training_R2,list_testing_R2 =fit_CV(df,
+#                                              pfeatures,
+#                                              th,
+#                                              clustering,
+#                                              classification,
+#                                              n_iter,
+#                                              n_clusters,
+#                                              random_state,
+#                                              OutputFlag = 0,
+#                                              n=n,
+#                                              cv=5)

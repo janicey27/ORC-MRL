@@ -256,7 +256,6 @@ def split(df,  # pandas dataFrame
 # Returns the final resulting dataframe
 def splitter(df,  # pandas dataFrame
              pfeatures,  # integer: number of features
-             k,  # integer: indexer
              th, # integer: threshold for minimum split
              df_test,
              classification='LogisticRegression',  # string: classification alg
@@ -270,7 +269,10 @@ def splitter(df,  # pandas dataFrame
     testing_acc = []
     testing_error = []
     training_error = []
-    nc = k
+    
+    k = df['CLUSTER'].nunique() #initial number of clusters 
+    nc = k #number of clusters
+    
     df_new = deepcopy(df)
     
     # Setting progress bar--------------
@@ -281,7 +283,6 @@ def splitter(df,  # pandas dataFrame
         split_bar.set_description("Splitting... |#Clusters:%s" %(nc))
         cont = False
         c, a = findContradiction(df_new, th)
-        print('Iteration',i+1, '| #Clusters=',nc+1, '------------------------')
         if c != -1:
             if OutputFlag == 1:
                 print('Cluster Content')
@@ -365,7 +366,6 @@ def splitter(df,  # pandas dataFrame
 # Splitter algorithm with cross-validation
 def fit_CV(df,
           pfeatures,
-          k,
           th,
           clustering,
           classification,
@@ -393,6 +393,7 @@ def fit_CV(df,
                                 clustering=clustering,
                                 n_clusters=n_clusters,
                                 random_state=random_state)
+        k = df_init['CLUSTER'].nunique()
         #################################################################
         
         #################################################################
@@ -400,7 +401,6 @@ def fit_CV(df,
         
         df_new,training_R2,testing_R2 = splitter(df_init,
                                           pfeatures,
-                                          k,
                                           th,
                                           df_test,
                                           classification,

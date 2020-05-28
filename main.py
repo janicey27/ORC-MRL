@@ -30,20 +30,20 @@ random.seed(5)
 
 #################################################################
 # Set Parameters
-n = 20
-m = 5
+n = 10
+m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.08, 0], [0, 0.08]]
-N = 600
-T = 5
+sigma = [[0.05, 0], [0, 0.05]]
+N = 200
+T = 6
 clustering = ''
 n_clusters = 6
 random_state = 0
 k = n_clusters
 classification = 'DecisionTreeClassifier'
-n_iter = 100
+n_iter = 15
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
 #################################################################
@@ -106,7 +106,6 @@ df = initializeClusters(df_train,
 
 df_new,training_R2,testing_R2 = splitter(df,
                                   pfeatures,
-                                  k,
                                   th,
                                   df_test,
                                   classification,
@@ -116,7 +115,7 @@ df_new,training_R2,testing_R2 = splitter(df,
 
 #################################################################
 
-print(purity(df_new))
+#print(purity(df_new))
 #plot_features(df)
 model = predict_cluster(df_new, pfeatures)
 
