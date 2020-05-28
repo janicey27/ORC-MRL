@@ -56,6 +56,7 @@ def predict_cluster(df_new, # dataframe: trained clusters
 
 # predict_value_of_cluster() takes in MDP parameters, a cluster label, and 
 # and a list of actions, and returns the predicted value of the given cluster
+# currently takes value of current cluster as well as next cluster
 def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
                              cluster, # int: cluster number
                              actions): # list: list of actions

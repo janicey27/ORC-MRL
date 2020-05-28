@@ -441,7 +441,7 @@ def fit_CV(df,
 #    ax1.plot(its, testing_acc, label = "Testing Accuracy")
     if n>0:
         ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-    ax1.set_ylim(0,1)
+    ax1.set_ylim(0)
     ax1.set_xlabel('# of Clusters')
     ax1.set_ylabel('Mean CV Error or Accuracy %')
     ax1.set_title('Mean CV Error and Accuracy During Splitting')

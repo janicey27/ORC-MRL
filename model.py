@@ -30,9 +30,9 @@ class MDP_model:
         self.R_df = None #Reward function of the learnt MDP
         
         
-    # fit() takes in parameters for prediction, and trains the model on the 
+    # fit_CV() takes in parameters for prediction, and trains the model on the 
     # optimal clustering for a given horizon h
-    def fit(self, 
+    def fit_CV(self, 
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
             #h=5, # int: time horizon (# of actions we want to optimize)
@@ -120,3 +120,8 @@ class MDP_model:
                                         actions)
         return v
     
+    # take an ID & actions, and predict what will happen from there
+    def predict_forward(self,
+                        ID,
+                        actions):
+        pass

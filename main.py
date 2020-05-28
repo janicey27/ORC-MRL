@@ -31,23 +31,23 @@ random.seed(5)
 
 #################################################################
 # Set Parameters
-n = 10
+n = 20
 m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.2, 0], [0, 0.2]]
-N = 200
+sigma = [[0.09, 0], [0, 0.09]]
+N = 250
 T = 6
 clustering = 'Agglomerative'
 n_clusters = None # for KMeans
 random_state = 0
 classification = 'DecisionTreeClassifier'
-n_iter = 10
+n_iter = 20
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
 cv = 5
-distance_threshold = 0.3
+distance_threshold = 0.01
 #################################################################
 
 
@@ -92,7 +92,7 @@ df = transformSamples(samples,
                       pfeatures)
 
 m = MDP_model()
-m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     #h, # int: time horizon (# of actions we want to optimize)
     n_iter, # int: number of iterations
