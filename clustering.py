@@ -22,7 +22,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
 #from xgboost import XGBClassifier
 from collections import Counter
 from itertools import groupby
@@ -263,9 +263,10 @@ def splitter(df,  # pandas dataFrame
              opt_nc = None,
              classification='LogisticRegression',  # string: classification alg
              it=6, # integer: max number of iterations
-             #h=5,
+             h=5,
              OutputFlag = 1,
-             n=-1):  
+             n=-1,
+             plot = False):  
     # initializing lists for error & accuracy data
     training_R2 = []
     testing_R2 = []
@@ -304,7 +305,7 @@ def splitter(df,  # pandas dataFrame
             
             R2_train = R2_value_training(df_new)
             train_acc = training_accuracy(df_new)[0]
-            train_error = training_value_error(df_new)            
+            train_error = training_value_error(df_new, relative=False, h=h)            
             training_R2.append(R2_train)            
             training_acc.append(train_acc)                        
             training_error.append(train_error)
@@ -313,7 +314,7 @@ def splitter(df,  # pandas dataFrame
                 model = predict_cluster(df_new, pfeatures)
                 R2_test = R2_value_testing(df_test, df_new, model, pfeatures)
                 test_acc = testing_accuracy(df_test, df_new, model, pfeatures)[0]
-                test_error = testing_value_error(df_test, df_new, model, pfeatures)
+                test_error = testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=h)
                 testing_R2.append(R2_test)
                 testing_acc.append(test_acc)
                 testing_error.append(test_error)
@@ -343,33 +344,34 @@ def splitter(df,  # pandas dataFrame
     
     # plotting functions
     ## Plotting accuracy and value R2
-    fig1, ax1 = plt.subplots()
-    its = np.arange(k+1, nc+1)
-    ax1.plot(its, training_R2, label= "Training R2")
-    ax1.plot(its, training_acc, label = "Training Accuracy")
-    if testing:
-        ax1.plot(its, testing_acc, label = "Testing Accuracy")
-        ax1.plot(its, testing_R2, label = "Testing R2")
-    if n>0:
-        ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-    ax1.set_ylim(0,1)
-    ax1.set_xlabel('# of Clusters')
-    ax1.set_ylabel('R2 or Accuracy %')
-    ax1.set_title('R2 and Accuracy During Splitting')
-    ax1.legend()
-    ## Plotting value error E((v_est - v_true)^2)
-    fig2, ax2 = plt.subplots()
-    ax2.plot(its, training_error, label = "Training Error")
-    if testing:
-        ax2.plot(its, testing_error, label = "Testing Error")
-    if n>0:
-        ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-    ax2.set_ylim(0)
-    ax2.set_xlabel('# of Clusters')
-    ax2.set_ylabel('Value error')
-    ax2.set_title('Value error by number of clusters')
-    ax2.legend()
-    plt.show()
+    if plot:
+        fig1, ax1 = plt.subplots()
+        its = np.arange(k+1, nc+1)
+        ax1.plot(its, training_R2, label= "Training R2")
+        ax1.plot(its, training_acc, label = "Training Accuracy")
+        if testing:
+            ax1.plot(its, testing_acc, label = "Testing Accuracy")
+            ax1.plot(its, testing_R2, label = "Testing R2")
+        if n>0:
+            ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+        ax1.set_ylim(0,1)
+        ax1.set_xlabel('# of Clusters')
+        ax1.set_ylabel('R2 or Accuracy %')
+        ax1.set_title('R2 and Accuracy During Splitting')
+        ax1.legend()
+        ## Plotting value error E((v_est - v_true)^2)
+        fig2, ax2 = plt.subplots()
+        ax2.plot(its, training_error, label = "Training Error")
+        if testing:
+            ax2.plot(its, testing_error, label = "Testing Error")
+        if n>0:
+            ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+        ax2.set_ylim(0)
+        ax2.set_xlabel('# of Clusters')
+        ax2.set_ylabel('Value error')
+        ax2.set_title('Value error by number of clusters')
+        ax2.legend()
+        plt.show()
     
     return(df_new,training_error,testing_error)
 
@@ -387,22 +389,30 @@ def fit_CV(df,
           n_iter,
           n_clusters,
           random_state,
-          #h,
+          h,
           OutputFlag = 0,
           cv=5,
-          n=-1):
+          n=-1,
+          plot = False):
     
     list_training_error = []
     list_testing_error = []
     data_size = df['ID'].max()
     
-    cv_bar = tqdm(range(cv))
-    cv_bar.set_description("Cross-Validation...")
-    for i in cv_bar:
-        cv_bar.set_description("Cross-Validation... | Test set # %i" %i)
+    #cv_bar = tqdm(range(cv))
+    #cv_bar.set_description("Cross-Validation...")
+    r = np.random.randint(100)
+    gss = GroupShuffleSplit(n_splits=cv, train_size=(1-1/cv), random_state=r)
+    #cv_bar = tqdm(range(cv))
+    #cv_bar.set_description("Cross-Validation...")
+    #for i in cv_bar:
+    for train_idx, test_idx in gss.split(df, y=None, groups=df['ID']):
+        #cv_bar.set_description("Cross-Validation... | Test set # %i" %i)
         
-        df_test = df[(df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv)] #WARNING last datapoint not included
-        df_train = df[~((df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv))]
+        #df_test = df[(df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv)]
+        #df_train = df[~((df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv))]
+        df_train = df[df.index.isin(train_idx)]
+        df_test = df[df.index.isin(test_idx)]
         #################################################################
         # Initialize Clusters
         df_init = initializeClusters(df_train,
@@ -424,27 +434,29 @@ def fit_CV(df,
                                           opt_nc = None,
                                           classification = classification,
                                           it = n_iter,
-                                          #h, 
+                                          h = h, 
                                           OutputFlag = 0,
-                                          n=n)
+                                          n=n,
+                                          plot = plot)
         list_training_error.append(np.array(training_error))
         list_testing_error.append(np.array(testing_error))
         
     cv_training_error = np.mean(np.array(list_training_error),axis=0)
     cv_testing_error = np.mean(np.array(list_testing_error),axis=0)
     
-    fig1, ax1 = plt.subplots()
-    its = np.arange(k+1,k+1+len(cv_training_error))
-    ax1.plot(its, cv_training_error, label= "CV Training Error")
-    ax1.plot(its, cv_testing_error, label = "CV Testing Error")
-#    ax1.plot(its, training_acc, label = "Training Accuracy")
-#    ax1.plot(its, testing_acc, label = "Testing Accuracy")
-    if n>0:
-        ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-    ax1.set_ylim(0)
-    ax1.set_xlabel('# of Clusters')
-    ax1.set_ylabel('Mean CV Error or Accuracy %')
-    ax1.set_title('Mean CV Error and Accuracy During Splitting')
-    ax1.legend()
+    if plot:
+        fig1, ax1 = plt.subplots()
+        its = np.arange(k+1,k+1+len(cv_training_error))
+        ax1.plot(its, cv_training_error, label= "CV Training Error")
+        ax1.plot(its, cv_testing_error, label = "CV Testing Error")
+    #    ax1.plot(its, training_acc, label = "Training Accuracy")
+    #    ax1.plot(its, testing_acc, label = "Testing Accuracy")
+        if n>0:
+            ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+        ax1.set_ylim(0)
+        ax1.set_xlabel('# of Clusters')
+        ax1.set_ylabel('Mean CV Error or Accuracy %')
+        ax1.set_title('Mean CV Error and Accuracy During Splitting')
+        ax1.legend()
     
     return (list_training_error,list_testing_error, k)

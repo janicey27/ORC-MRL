@@ -24,6 +24,7 @@ class MDP_model:
         self.pfeatures = None # number of features
         self.CV_error = None # error at minimum point of CV
         self.CV_error_all = None # errors of different clusters after CV
+        self.opt_nc = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features
         self.P_df = None #Transition function of the learnt MDP
@@ -31,11 +32,12 @@ class MDP_model:
         
         
     # fit_CV() takes in parameters for prediction, and trains the model on the 
-    # optimal clustering for a given horizon h
+    # optimal clustering for a given horizon h (# of actions), using cross
+    # validation.
     def fit_CV(self, 
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
-            #h=5, # int: time horizon (# of actions we want to optimize)
+            h=5, # int: time horizon (# of actions we want to optimize)
             n_iter=70, # int: number of iterations
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
@@ -43,7 +45,8 @@ class MDP_model:
             classification = 'DecisionTreeClassifier', # classification method
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
             n_clusters = None, # number of clusters for KMeans
-            random_state = 0):
+            random_state = 0,
+            plot = False):
         
         df = data.copy()
             
@@ -61,9 +64,10 @@ class MDP_model:
                                               n_iter,
                                               n_clusters,
                                               random_state,
-                                              #h = h,
+                                              h = h,
                                               OutputFlag = 0,
-                                              cv=cv)
+                                              cv=cv, 
+                                              plot = plot)
         
         # find the best cluster
         cv_testing_error = np.mean(np.array(list_testing_error),axis=0)
@@ -91,8 +95,9 @@ class MDP_model:
                                           opt_nc = self.opt_nc,
                                           classification=classification,
                                           it = n_iter,
-                                          #h=h,
-                                          OutputFlag = 0)
+                                          h=h,
+                                          OutputFlag = 0,
+                                          plot = plot)
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
@@ -103,6 +108,55 @@ class MDP_model:
         self.P_df = P_df
         self.R_df = R_df
     
+    # fit() takes in the parameters for prediction, and directly fits the model
+    # to the data without running cross validation
+    def fit(self, 
+            data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+            pfeatures, # int: number of features
+            h=5, # int: time horizon (# of actions we want to optimize)
+            n_iter=70, # int: number of iterations
+            distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
+            cv=5, # number for cross validation
+            th=0, # splitting threshold
+            classification = 'DecisionTreeClassifier', # classification method
+            clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
+            n_clusters = None, # number of clusters for KMeans
+            random_state = 0,
+            plot = False):
+    
+        df = data.copy()
+            
+        # save relevant data
+        self.df = df
+        self.pfeatures = pfeatures
+        
+        # training on all the data
+        df_init = initializeClusters(self.df,
+                                clustering=clustering,
+                                n_clusters=n_clusters,
+                                distance_threshold = distance_threshold,
+                                random_state=random_state)
+        
+        df_new,training_error,testing_error = splitter(df_init,
+                                          pfeatures=self.pfeatures,
+                                          th=th,
+                                          df_test = None,
+                                          testing = False,
+                                          opt_nc = None,
+                                          classification=classification,
+                                          it = n_iter,
+                                          h=h,
+                                          OutputFlag = 0,
+                                          plot = plot)
+        
+        # storing trained dataset and predict_cluster function
+        self.df_trained = df_new
+        self.m = predict_cluster(self.df_trained, self.pfeatures)
+        
+        # store P_df and R_df values
+        P_df,R_df = get_MDP(self.df_trained)
+        self.P_df = P_df
+        self.R_df = R_df
     
     # predict() takes a list of features and a time horizon, and returns 
     # the predicted value after all actions are taken in order
@@ -120,8 +174,18 @@ class MDP_model:
                                         actions)
         return v
     
-    # take an ID & actions, and predict what will happen from there
+    # predict_forward() takes an ID & actions, and returns the predicted value
+    # for this ID after all actions are taken in order
     def predict_forward(self,
                         ID,
                         actions):
-        pass
+        
+        # cluster of this last point
+        s = self.df_trained[self.df_trained['ID']==ID].iloc[-1, -2]
+        
+        # predict value sum given starting cluster and action path
+        v = predict_value_of_cluster(self.P_df,
+                                        self.R_df,
+                                        s,
+                                        actions)
+        return v

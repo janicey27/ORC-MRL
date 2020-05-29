@@ -149,8 +149,8 @@ def purity(df):
 # Returns a float of average value error per ID 
 def training_value_error(df_new, #Outpul of algorithm
                          relative=False, #Output Raw error or RMSE ie ((\hat{v}-v)/v)^2
-                         h=5 #Length of forcast. The error is computed on v_h = \sum_{t=h}^H v_t
-                         ):
+                         h=5): # Length of forecast. The error is computed on v_h = \sum_{t=h}^H v_t
+                               # if h = -1, we forecast the whole path
     E_v = 0
     P_df,R_df = get_MDP(df_new)
     df2 = df_new.reset_index()
@@ -162,22 +162,26 @@ def training_value_error(df_new, #Outpul of algorithm
         index = df2['index'].iloc[i]
         # initializing first state for each ID
         cont = True
-        H = -1
-            # Computing Horizon H of ID i
-        while cont:
-            H+= 1
-            try: 
-                df_new['ID'].loc[index+H+1]
-            except:
-                break
-            if df_new['ID'].loc[index+H] != df_new['ID'].loc[index+H+1]:
-                break
-        t = H-h
-        s = df_new['CLUSTER'].loc[index + t]
-        a = df_new['ACTION'].loc[index + t]
-        v_true = df_new['RISK'].loc[index + t]
-        v_estim = R_df.loc[s]
-        t = H-h +1
+        
+        if h == -1:
+            t = 0
+        else:
+            H = -1
+                # Computing Horizon H of ID i
+            while cont:
+                H+= 1
+                try: 
+                    df_new['ID'].loc[index+H+1]
+                except:
+                    break
+                if df_new['ID'].loc[index+H] != df_new['ID'].loc[index+H+1]:
+                    break
+            t = H-h
+            s = df_new['CLUSTER'].loc[index + t]
+            a = df_new['ACTION'].loc[index + t]
+            v_true = df_new['RISK'].loc[index + t]
+            v_estim = R_df.loc[s]
+            t = H-h +1
         # predicting path of each ID
         while cont:
             v_true = v_true + df_new['RISK'].loc[index + t]
@@ -205,7 +209,8 @@ def training_value_error(df_new, #Outpul of algorithm
 
 # testing_value_error() takes in a dataframe of testing data, and dataframe of 
 # new clustered data, a model from predict_cluster function, and computes the
-# expected value error given actions and a predicted initial cluster
+# expected value error given actions and a predicted initial cluster and time
+# horizon h (ifh = -1, we forecast the whole path)
 # Returns a float of sqrt average value error per ID
 def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
     E_v = 0
@@ -219,23 +224,28 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
         # initializing index of first state for each ID
         index = df2['index'].iloc[i]
         cont = True
-        H = -1
-        # Computing Horizon H of ID i
-        while cont:
-            H+= 1
-            try: 
-                df_test['ID'].loc[index+H+1]
-            except:
-                break
-            if df_test['ID'].loc[index+H] != df_test['ID'].loc[index+H+1]:
-                break
-        t = H-h
-        s = df_test['CLUSTER'].loc[index + t]
-        a = df_test['ACTION'].loc[index + t]
-        v_true = df_test['RISK'].loc[index + t]
-        v_estim = R_df.loc[s]
         
-        t = H-h+1
+        if h == -1:
+            t = 0
+        
+        else:
+            H = -1
+            # Computing Horizon H of ID i
+            while cont:
+                H+= 1
+                try: 
+                    df_test['ID'].loc[index+H+1]
+                except:
+                    break
+                if df_test['ID'].loc[index+H] != df_test['ID'].loc[index+H+1]:
+                    break
+            t = H-h
+            s = df_test['CLUSTER'].loc[index + t]
+            a = df_test['ACTION'].loc[index + t]
+            v_true = df_test['RISK'].loc[index + t]
+            v_estim = R_df.loc[s]
+            
+            t = H-h+1
         # predicting path of each ID
         while cont:
             v_true = v_true + df_test['RISK'].loc[index + t]
