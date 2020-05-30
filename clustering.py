@@ -14,6 +14,8 @@ Created on Sun Mar  1 18:48:20 2020
 import pandas as pd
 import numpy as np
 import matplotlib as plt
+import random
+from datetime import datetime
 from tqdm import tqdm #progress bar
 import binascii
 from copy import deepcopy
@@ -22,7 +24,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV, GroupShuffleSplit
+from sklearn.model_selection import GridSearchCV, GroupKFold
 #from xgboost import XGBClassifier
 from collections import Counter
 from itertools import groupby
@@ -397,22 +399,25 @@ def fit_CV(df,
     
     list_training_error = []
     list_testing_error = []
-    data_size = df['ID'].max()
+    #data_size = df['ID'].max()
     
-    #cv_bar = tqdm(range(cv))
-    #cv_bar.set_description("Cross-Validation...")
-    r = np.random.randint(100)
-    gss = GroupShuffleSplit(n_splits=cv, train_size=(1-1/cv), random_state=r)
-    #cv_bar = tqdm(range(cv))
-    #cv_bar.set_description("Cross-Validation...")
-    #for i in cv_bar:
-    for train_idx, test_idx in gss.split(df, y=None, groups=df['ID']):
-        #cv_bar.set_description("Cross-Validation... | Test set # %i" %i)
+    gkf = GroupKFold(n_splits=cv)
+    # shuffle the ID's (create a new column), and do splits based on new ID's
+    random.seed(datetime.now())
+    g = [df for _, df in df.groupby('ID')]
+    random.shuffle(g)
+    df = pd.concat(g).reset_index(drop=True)
+    ids = df.groupby(['ID'], sort=False).ngroup()
+    df['ID_shuffle'] = ids
+    for train_idx, test_idx in gkf.split(df, y=None, groups=df['ID_shuffle']):
+        
         
         #df_test = df[(df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv)]
         #df_train = df[~((df['ID']<(i+1)*data_size//cv) & (df['ID']>=i*data_size//cv))]
         df_train = df[df.index.isin(train_idx)]
+        
         df_test = df[df.index.isin(test_idx)]
+        #print('IDs in testing', df_test['ID'].unique())
         #################################################################
         # Initialize Clusters
         df_init = initializeClusters(df_train,
@@ -421,6 +426,7 @@ def fit_CV(df,
                                 distance_threshold = distance_threshold,
                                 random_state=random_state)
         k = df_init['CLUSTER'].nunique()
+        #print('k', k)
         #################################################################
         
         #################################################################

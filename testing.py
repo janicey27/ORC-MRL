@@ -165,6 +165,7 @@ def training_value_error(df_new, #Outpul of algorithm
         
         if h == -1:
             t = 0
+            
         else:
             H = -1
                 # Computing Horizon H of ID i
@@ -177,11 +178,13 @@ def training_value_error(df_new, #Outpul of algorithm
                 if df_new['ID'].loc[index+H] != df_new['ID'].loc[index+H+1]:
                     break
             t = H-h
-            s = df_new['CLUSTER'].loc[index + t]
-            a = df_new['ACTION'].loc[index + t]
-            v_true = df_new['RISK'].loc[index + t]
-            v_estim = R_df.loc[s]
-            t = H-h +1
+            
+        s = df_new['CLUSTER'].loc[index + t]
+        a = df_new['ACTION'].loc[index + t]
+        v_true = df_new['RISK'].loc[index + t]
+        v_estim = R_df.loc[s]
+        t += 1
+        
         # predicting path of each ID
         while cont:
             v_true = v_true + df_new['RISK'].loc[index + t]
@@ -227,7 +230,7 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
         
         if h == -1:
             t = 0
-        
+
         else:
             H = -1
             # Computing Horizon H of ID i
@@ -240,12 +243,13 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
                 if df_test['ID'].loc[index+H] != df_test['ID'].loc[index+H+1]:
                     break
             t = H-h
-            s = df_test['CLUSTER'].loc[index + t]
-            a = df_test['ACTION'].loc[index + t]
-            v_true = df_test['RISK'].loc[index + t]
-            v_estim = R_df.loc[s]
             
-            t = H-h+1
+        s = df_test['CLUSTER'].loc[index + t]
+        a = df_test['ACTION'].loc[index + t]
+        v_true = df_test['RISK'].loc[index + t]
+        v_estim = R_df.loc[s]
+            
+        t += 1
         # predicting path of each ID
         while cont:
             v_true = v_true + df_test['RISK'].loc[index + t]

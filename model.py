@@ -34,7 +34,7 @@ class MDP_model:
     # fit_CV() takes in parameters for prediction, and trains the model on the 
     # optimal clustering for a given horizon h (# of actions), using cross
     # validation.
-    def fit_CV(self, 
+    def fit_with_CV(self, 
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
@@ -56,18 +56,19 @@ class MDP_model:
         
         # run cross validation on the data to find best clusters
         list_training_error,list_testing_error, k =fit_CV(self.df,
-                                              self.pfeatures,
-                                              th,
-                                              clustering,
-                                              distance_threshold,
-                                              classification,
-                                              n_iter,
-                                              n_clusters,
-                                              random_state,
-                                              h = h,
-                                              OutputFlag = 0,
-                                              cv=cv, 
-                                              plot = plot)
+                                                          self.pfeatures,
+                                                          th,
+                                                          clustering,
+                                                          distance_threshold,
+                                                          classification,
+                                                          n_iter,
+                                                          n_clusters,
+                                                          random_state,
+                                                          h,
+                                                          OutputFlag = 0,
+                                                          cv=cv,
+                                                          n=-1,
+                                                          plot = plot)
         
         # find the best cluster
         cv_testing_error = np.mean(np.array(list_testing_error),axis=0)
