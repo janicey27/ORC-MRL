@@ -36,14 +36,14 @@ m = 3
 reward_dep_action = False
 deterministic = True
 pfeatures = 2
-sigma = [[0.01, 0], [0, 0.01]]
-N = 200
+sigma = [[0.05, 0], [0, 0.05]]
+N = 250
 T = 5
 clustering = 'Agglomerative'
 n_clusters = None # for KMeans
 random_state = 0
 classification = 'DecisionTreeClassifier'
-n_iter = 9
+max_k = 20
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
 cv = 5
@@ -93,10 +93,10 @@ df = transformSamples(samples,
                       pfeatures)
 
 m = MDP_model()
-m.fit_with_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
-    n_iter, # int: number of iterations
+    max_k, # int: number of iterations
     distance_threshold, # clustering diameter for Agglomerative clustering
     cv, # number for cross validation
     th, # splitting threshold

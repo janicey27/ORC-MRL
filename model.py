@@ -24,7 +24,8 @@ class MDP_model:
         self.pfeatures = None # number of features
         self.CV_error = None # error at minimum point of CV
         self.CV_error_all = None # errors of different clusters after CV
-        self.opt_nc = None # number of clusters in optimal clustering
+        self.training_error = None # training error after very last split
+        self.opt_k = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features
         self.P_df = None #Transition function of the learnt MDP
@@ -34,11 +35,11 @@ class MDP_model:
     # fit_CV() takes in parameters for prediction, and trains the model on the 
     # optimal clustering for a given horizon h (# of actions), using cross
     # validation.
-    def fit_with_CV(self, 
+    def fit_CV(self, 
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
-            n_iter=70, # int: number of iterations
+            max_k=70, # int: max number of clusters
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
             th=0, # splitting threshold
@@ -55,31 +56,29 @@ class MDP_model:
         self.pfeatures = pfeatures
         
         # run cross validation on the data to find best clusters
-        list_training_error,list_testing_error, k =fit_CV(self.df,
-                                                          self.pfeatures,
-                                                          th,
-                                                          clustering,
-                                                          distance_threshold,
-                                                          classification,
-                                                          n_iter,
-                                                          n_clusters,
-                                                          random_state,
-                                                          h,
-                                                          OutputFlag = 0,
-                                                          cv=cv,
-                                                          n=-1,
-                                                          plot = plot)
+        cv_training_error,cv_testing_error =fit_CV(self.df,
+                                                  self.pfeatures,
+                                                  th,
+                                                  clustering,
+                                                  distance_threshold,
+                                                  classification,
+                                                  max_k,
+                                                  n_clusters,
+                                                  random_state,
+                                                  h,
+                                                  OutputFlag = 0,
+                                                  cv=cv,
+                                                  n=-1,
+                                                  plot = plot)
         
         # find the best cluster
-        cv_testing_error = np.mean(np.array(list_testing_error),axis=0)
-        it = np.argmin(cv_testing_error)
-        print('minimum iterations:', it+1) # this is iterations, but should be cluster
-        print('best clusters:', k+it+1)
+        k = cv_testing_error.idxmin()
+        print('best clusters:', k)
         
         # save total error and error corresponding to chosen model
-        self.CV_error = cv_testing_error[it]
+        self.CV_error = cv_testing_error.loc[k]
         self.CV_error_all = cv_testing_error
-        self.opt_nc = k+it+1
+        self.opt_k = k
         
         # actual training on all the data
         df_init = initializeClusters(self.df,
@@ -93,12 +92,19 @@ class MDP_model:
                                           th=th,
                                           df_test = None,
                                           testing = False,
-                                          opt_nc = self.opt_nc,
+                                          max_k = self.opt_k,
                                           classification=classification,
-                                          it = n_iter,
                                           h=h,
                                           OutputFlag = 0,
                                           plot = plot)
+        
+        # store final training error
+        try:
+            # if splitter doesn't need to split at all, then no training error
+            self.training_error = training_error.iloc[-1]
+        except:
+            pass
+        
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
@@ -108,6 +114,7 @@ class MDP_model:
         P_df,R_df = get_MDP(self.df_trained)
         self.P_df = P_df
         self.R_df = R_df
+        
     
     # fit() takes in the parameters for prediction, and directly fits the model
     # to the data without running cross validation
@@ -115,7 +122,7 @@ class MDP_model:
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
-            n_iter=70, # int: number of iterations
+            max_k=70, # int: max number of clusters
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
             th=0, # splitting threshold
@@ -143,12 +150,14 @@ class MDP_model:
                                           th=th,
                                           df_test = None,
                                           testing = False,
-                                          opt_nc = None,
+                                          max_k = max_k,
                                           classification=classification,
-                                          it = n_iter,
                                           h=h,
                                           OutputFlag = 0,
                                           plot = plot)
+        
+        # store final training error
+        self.training_error = training_error.iloc[-1]
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
