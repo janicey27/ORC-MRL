@@ -24,7 +24,7 @@ class MDP_model:
         self.pfeatures = None # number of features
         self.CV_error = None # error at minimum point of CV
         self.CV_error_all = None # errors of different clusters after CV
-        self.training_error = None # training error after very last split
+        self.training_error = None # training errors after last split sequence
         self.opt_k = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features
@@ -99,12 +99,7 @@ class MDP_model:
                                           plot = plot)
         
         # store final training error
-        try:
-            # if splitter doesn't need to split at all, then no training error
-            self.training_error = training_error.iloc[-1]
-        except:
-            pass
-        
+        self.training_error = training_error
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
@@ -156,8 +151,8 @@ class MDP_model:
                                           OutputFlag = 0,
                                           plot = plot)
         
-        # store final training error
-        self.training_error = training_error.iloc[-1]
+        # store all training errors
+        self.training_error = training_error
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new

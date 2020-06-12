@@ -179,22 +179,20 @@ def training_value_error(df_new, #Outpul of algorithm
                     break
             t = H-h
             
+        v_true = 0
+        v_estim = 0
         s = df_new['CLUSTER'].loc[index + t]
         a = df_new['ACTION'].loc[index + t]
-        v_true = df_new['RISK'].loc[index + t]
-        v_estim = R_df.loc[s]
-        t += 1
         
         # predicting path of each ID
         while cont:
             v_true = v_true + df_new['RISK'].loc[index + t]
+            v_estim = v_estim + R_df.loc[s]
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
                 print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
-            a = df_new['ACTION'].loc[index + t]
-            v_estim = v_estim + R_df.loc[s]
             try: 
                 df_new['ID'].loc[index+t+1]
             except:
@@ -202,6 +200,7 @@ def training_value_error(df_new, #Outpul of algorithm
             if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
                 break
             t += 1
+            a = df_new['ACTION'].loc[index + t]
         if relative:
             E_v = E_v + ((v_true-v_estim)/v_true)**2
         else:
@@ -243,24 +242,22 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
                 if df_test['ID'].loc[index+H] != df_test['ID'].loc[index+H+1]:
                     break
             t = H-h
-            
+        
+        v_true = 0
+        v_estim = 0
         s = df_test['CLUSTER'].loc[index + t]
         a = df_test['ACTION'].loc[index + t]
-        v_true = df_test['RISK'].loc[index + t]
-        v_estim = R_df.loc[s]
-            
-        t += 1
+        
         # predicting path of each ID
         while cont:
             v_true = v_true + df_test['RISK'].loc[index + t]
+            v_estim = v_estim + R_df.loc[s]
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
             except TypeError:
                 print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             
-            a = df_test['ACTION'].loc[index + t]
-            v_estim = v_estim + R_df.loc[s]
             try: 
                 df_test['ID'].loc[index+t+1]
             except:
@@ -268,6 +265,7 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
             if df_test['ID'].loc[index+t] != df_test['ID'].loc[index+t+1]:
                 break 
             t += 1
+            a = df_test['ACTION'].loc[index + t]
         if relative:
             E_v = E_v + ((v_true-v_estim)/v_true)**2
         else:
@@ -284,6 +282,7 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
 
 # R2_value_training() takes in a clustered dataframe, and returns a float 
 # of the R-squared value between the expected value and true value of samples
+# currently doesn't support horizon h specifications
 def R2_value_training(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
@@ -332,6 +331,7 @@ def R2_value_training(df_new):
 # R2_value_testing() takes a dataframe of testing data, a clustered dataframe, 
 # a model outputted by predict_cluster, and returns a float of the R-squared
 # value between the expected value and true value of samples in the test set
+# currently doesn't support horizon h specifications
 def R2_value_testing(df_test, df_new, model, pfeatures):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
@@ -383,7 +383,7 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
 
 
 #################################################################
-# Functions for Plotting
+# Functions for Plotting and Visualization
     
 # plot_features() takes in a dataframe of two features, and plots the data
 # to illustrate the noise in each original cluster
@@ -395,6 +395,27 @@ def plot_features(df):
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
     plt.show()
+
+
+# cluster_size() takes a dataframe, and returns the main statistics of each
+# cluster in a dataframe
+def cluster_size(df):
+    df2 = df.groupby('CLUSTER')['RISK'].agg(['count','mean','std','min','max'])
+    df2['rel'] = 100*abs(df2['std']/df2['mean'])
+    return df2
+
+
+# next_clusters() takes a dataframe, and returns a chart showing transitions from
+# each cluster/action pair, and the purity of the highest next_cluster. 
+# Disregards those with 'NEXT_CLUSTER' = None, and returns a dataframe of the results
+def next_clusters(df):
+    df = df.loc[df['NEXT_CLUSTER']!='None']
+    df2 = df.groupby(['CLUSTER', 'ACTION', 'NEXT_CLUSTER'])['RISK'].agg(['count'])
+    df2['purity'] = df2['count']/df.groupby(['CLUSTER', 'ACTION'])['RISK'].count()
+    df2.reset_index(inplace=True)
+    idx = df2.groupby(['CLUSTER', 'ACTION'])['count'].transform(max) == df2['count']
+    df_final = df2[idx].groupby(['CLUSTER','ACTION']).max()
+    return df_final
 #################################################################
     
 
