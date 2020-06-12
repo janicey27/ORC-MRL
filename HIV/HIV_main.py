@@ -14,7 +14,7 @@ import random
 import pandas as pd
 
 import sys
-sys.path.append('../Opioids/')
+sys.path.append('../Algorithm/')
 
 from MDPtools import *
 from model import MDP_model
@@ -28,7 +28,7 @@ N = 100
 T = 200
 clustering = 'Agglomerative'
 n_clusters = None
-distance_threshold = 100000
+distance_threshold = 30000
 random_state = 0
 pfeatures = 6
 h = -1
