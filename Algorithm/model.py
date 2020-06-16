@@ -12,7 +12,6 @@ Model Class that runs the Iterative Clustering algorithm on any data.
 # Load Libraries
 import pandas as pd
 import numpy as np
-from datetime import timedelta
 
 from clustering import *
 from testing import *
@@ -139,6 +138,8 @@ class MDP_model:
                                 n_clusters=n_clusters,
                                 distance_threshold = distance_threshold,
                                 random_state=random_state)
+        
+        print('Clusters Initialized')
         
         df_new,training_error,testing_error = splitter(df_init,
                                           pfeatures=self.pfeatures,

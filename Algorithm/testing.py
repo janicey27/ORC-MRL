@@ -22,17 +22,6 @@ from sklearn.model_selection import GridSearchCV
 #################################################################
 # Functions for Predictions
 
-# get_predictions() takes in a clustered dataframe df_new, and maps each 
-# CLUSTER to an OG_CLUSTER that has the most elements
-# Returns a dataframe of the mappings
-def get_predictions(df_new):
-    df0 = df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count()
-    df0 = df0.groupby('CLUSTER').idxmax()
-    df2 = pd.DataFrame()
-    df2['OG_CLUSTER'] = df0.apply(lambda x: x[1])
-    return df2
-
-
 # predict_cluster() takes in a clustered dataframe df_new, the number of 
 # features pfeatures, and returns a prediction model m that predicts the most
 # likely cluster from a datapoint's features
@@ -82,63 +71,7 @@ def get_MDP(df_new):
     R_df = df_new.groupby('CLUSTER')['RISK'].mean()
     return P_df,R_df
 #################################################################
-    
 
-#################################################################
-# Functions for Accuracy and Purity
-    
-# training_accuracy() takes in a clustered dataframe df_new, and returns the 
-# average training accuracy of all clusters (float) and a dataframe of 
-# training accuracies for each OG_CLUSTER
-def training_accuracy(df_new):
-    clusters = get_predictions(df_new)
-#    print('Clusters', clusters)
-    
-    # Tallies datapoints where the algorithm correctly classified a datapoint's
-    # original cluster to be the OG_CLUSTER mapping of its current cluster
-    accuracy = clusters.loc[df_new['CLUSTER']].reset_index()['OG_CLUSTER'] \
-                                        == df_new.reset_index()['OG_CLUSTER']
-    #print(accuracy)
-    tr_accuracy = accuracy.mean()
-    accuracy_df = accuracy.to_frame('Accuracy')
-    accuracy_df['OG_CLUSTER'] = df_new.reset_index()['OG_CLUSTER']
-    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
-    return (tr_accuracy, accuracy_df)
-
-
-# testing_accuracy() takes in a testing dataframe df_test (unclustered), 
-# a df_new clustered dataset, a model from predict_cluster and 
-# Returns a float for the testing accuracy measuring how well the model places
-# testing data into the right cluster (mapped from OG_CLUSTER), and 
-# also returns a dataframe that has testing accuracies for each OG_CLUSTER
-def testing_accuracy(df_test, # dataframe: testing data
-                     df_new, # dataframe: clustered on training data
-                     model, # function: output of predict_cluster
-                     pfeatures): # int: # of features
-    
-    clusters = get_predictions(df_new)
-    
-    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
-    df_test['CLUSTER'] = test_clusters
-    
-    accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] \
-                                        == df_test.reset_index()['OG_CLUSTER']
-    #print(accuracy)
-    tr_accuracy = accuracy.mean()
-    accuracy_df = accuracy.to_frame('Accuracy')
-    accuracy_df['OG_CLUSTER'] = df_test.reset_index()['OG_CLUSTER']
-    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
-    return (tr_accuracy, accuracy_df)
-
-
-# purity() takes a clustered dataframe and returns a dataframe with the purity 
-# of each cluster
-def purity(df):
-    su = pd.DataFrame(df.groupby(['CLUSTER'])['OG_CLUSTER']
-    .value_counts(normalize=True)).reset_index(level=0)
-    su.columns= ['CLUSTER','Purity']
-    return su.groupby('CLUSTER')['Purity'].max()
-#################################################################
     
 
 #################################################################
@@ -386,22 +319,22 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
 # Functions for Plotting and Visualization
     
 # plot_features() takes in a dataframe of two features, and plots the data
-# to illustrate the noise in each original cluster
+# to illustrate the noise in each cluster
 def plot_features(df):
     df.plot.scatter(x='FEATURE_1',
                       y='FEATURE_2',
-                      c='OG_CLUSTER',
+                      c='CLUSTER',
                       colormap='viridis')
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
     plt.show()
-
 
 # cluster_size() takes a dataframe, and returns the main statistics of each
 # cluster in a dataframe
 def cluster_size(df):
     df2 = df.groupby('CLUSTER')['RISK'].agg(['count','mean','std','min','max'])
     df2['rel'] = 100*abs(df2['std']/df2['mean'])
+    df2['rel_mean'] = 100*abs(df2['std']/df['RISK'].mean())
     return df2
 
 
@@ -420,5 +353,69 @@ def next_clusters(df):
     
 
 #################################################################
+# Functions for Grid Testing (Predictions, Accuracy, Purity)
+    
+# get_predictions() takes in a clustered dataframe df_new, and maps each 
+# CLUSTER to an OG_CLUSTER that has the most elements
+# Returns a dataframe of the mappings
+def get_predictions(df_new):
+    df0 = df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count()
+    df0 = df0.groupby('CLUSTER').idxmax()
+    df2 = pd.DataFrame()
+    df2['OG_CLUSTER'] = df0.apply(lambda x: x[1])
+    return df2
+    
 
+# training_accuracy() takes in a clustered dataframe df_new, and returns the 
+# average training accuracy of all clusters (float) and a dataframe of 
+# training accuracies for each OG_CLUSTER
+def training_accuracy(df_new):
+    clusters = get_predictions(df_new)
+#    print('Clusters', clusters)
+    
+    # Tallies datapoints where the algorithm correctly classified a datapoint's
+    # original cluster to be the OG_CLUSTER mapping of its current cluster
+    accuracy = clusters.loc[df_new['CLUSTER']].reset_index()['OG_CLUSTER'] \
+                                        == df_new.reset_index()['OG_CLUSTER']
+    #print(accuracy)
+    tr_accuracy = accuracy.mean()
+    accuracy_df = accuracy.to_frame('Accuracy')
+    accuracy_df['OG_CLUSTER'] = df_new.reset_index()['OG_CLUSTER']
+    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
+    return (tr_accuracy, accuracy_df)
+
+
+# testing_accuracy() takes in a testing dataframe df_test (unclustered), 
+# a df_new clustered dataset, a model from predict_cluster and 
+# Returns a float for the testing accuracy measuring how well the model places
+# testing data into the right cluster (mapped from OG_CLUSTER), and 
+# also returns a dataframe that has testing accuracies for each OG_CLUSTER
+def testing_accuracy(df_test, # dataframe: testing data
+                     df_new, # dataframe: clustered on training data
+                     model, # function: output of predict_cluster
+                     pfeatures): # int: # of features
+    
+    clusters = get_predictions(df_new)
+    
+    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
+    df_test['CLUSTER'] = test_clusters
+    
+    accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] \
+                                        == df_test.reset_index()['OG_CLUSTER']
+    #print(accuracy)
+    tr_accuracy = accuracy.mean()
+    accuracy_df = accuracy.to_frame('Accuracy')
+    accuracy_df['OG_CLUSTER'] = df_test.reset_index()['OG_CLUSTER']
+    accuracy_df = accuracy_df.groupby('OG_CLUSTER').mean()
+    return (tr_accuracy, accuracy_df)
+
+
+# purity() takes a clustered dataframe and returns a dataframe with the purity 
+# of each cluster
+def purity(df):
+    su = pd.DataFrame(df.groupby(['CLUSTER'])['OG_CLUSTER']
+    .value_counts(normalize=True)).reset_index(level=0)
+    su.columns= ['CLUSTER','Purity']
+    return su.groupby('CLUSTER')['Purity'].max()
+#################################################################
 

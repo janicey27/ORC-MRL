@@ -11,20 +11,26 @@ Main MDP clustering algorithm running.
 
 #import os
 #os.chdir("C:/Users/omars/Desktop/Georgia/opioids/iterativeMDP/") # To change
-from MDPtools import Generate_random_MDP, sample_MDP_with_features_list
+
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+
+import sys
+sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
+
 from model import MDP_model
+from MDPtools import Generate_random_MDP, sample_MDP_with_features_list
 #################################################################
 
 
 #################################################################
 # Load Libraries
 
-from clustering import defaultNormal, UnifNormal, transformSamples, \
-                        initializeClusters, splitter, split_train_test_by_id
+from clustering import initializeClusters, splitter, split_train_test_by_id
 from testing import *
+from grid_functions import * 
+# find a way to import grid_functions into the actual model which calls on splitter.......
 #################################################################
 
 random.seed(5)
@@ -93,7 +99,7 @@ df = transformSamples(samples,
                       pfeatures)
 
 m = MDP_model()
-m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
     max_k, # int: number of iterations
