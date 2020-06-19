@@ -14,8 +14,10 @@ Created on Sun Apr 26 23:13:09 2020
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import graphviz
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV
+from sklearn import tree
 #################################################################
 
 
@@ -318,12 +320,12 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
 #################################################################
 # Functions for Plotting and Visualization
     
-# plot_features() takes in a dataframe of two features, and plots the data
+# plot_features() takes in a dataframe and two features, and plots the data
 # to illustrate the noise in each cluster
-def plot_features(df):
-    df.plot.scatter(x='FEATURE_1',
-                      y='FEATURE_2',
-                      c='CLUSTER',
+def plot_features(df, x, y, c='CLUSTER'):
+    df.plot.scatter(x=x,
+                      y=y,
+                      c=c,
                       colormap='viridis')
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
@@ -349,6 +351,21 @@ def next_clusters(df):
     idx = df2.groupby(['CLUSTER', 'ACTION'])['count'].transform(max) == df2['count']
     df_final = df2[idx].groupby(['CLUSTER','ACTION']).max()
     return df_final
+
+
+# decision_tree() takes in a trained MDP model, outputs a pdf of 
+# the best decision tree, as well as other visualizations
+def decision_tree(model):
+    # assumes that m.m, the prediction model, is a GridSearchCV object
+    dc = m.m.best_estimator_
+    
+    # creating the decision tree diagram in pdf: 
+    dot_data = tree.export_graphviz(dc, out_file=None) 
+    graph = graphviz.Source(dot_data) 
+    graph.render("Decision_Tree")
+    
+    
+    
 #################################################################
     
 
