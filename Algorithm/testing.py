@@ -227,7 +227,7 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
 def R2_value_training(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
-    print(P_df)
+    #print(P_df)
     df2 = df_new.reset_index()
     df2 = df2.groupby(['ID']).first()
     N = df2.shape[0]

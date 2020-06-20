@@ -210,6 +210,7 @@ def SolveMDP(P,R, gamma=0.9, epsilon=10**(-10), p=True, prob='min', method='Valu
     # R: Reward matrix
     # epsilon: convergence param of value iteration
     # prob: Specify if the objective is to minimize ('min') or maxmize ('max') outcome
+    m, n, n = P.shape
     if len(R.shape) < 3:
         R = expand(R, n, m)
     if method == 'Value':

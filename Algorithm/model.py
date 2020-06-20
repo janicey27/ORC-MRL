@@ -15,6 +15,7 @@ import numpy as np
 
 from clustering import *
 from testing import *
+from MDPtools import *
 #################################################################
 
 class MDP_model:
@@ -27,8 +28,10 @@ class MDP_model:
         self.opt_k = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features
-        self.P_df = None #Transition function of the learnt MDP
-        self.R_df = None #Reward function of the learnt MDP
+        self.P_df = None # Transition function of the learnt MDP
+        self.R_df = None # Reward function of the learnt MDP
+        self.v = None # value after MDP solved
+        self.pi = None # policy after MDP solved
         
         
     # fit_CV() takes in parameters for prediction, and trains the model on the 
@@ -233,6 +236,38 @@ class MDP_model:
         return error
     
     
-    # solve_MDP() takes the trained model and returns the the value and policy
-    def solve_MDP():
-        pass
+    # solve_MDP() takes the trained model as well as parameters for gamma, 
+    # epsilon, and whether the problem is a minimization or maximization one, 
+    # and returns the the value and policy
+    def solve_MDP(self,
+                  prob='max', 
+                  gamma=0.9, 
+                  epsilon=10**(-10), 
+                  p=True):
+        
+        P_df = self.P_df.reset_index()
+        #print(P_df)
+        P_df = P_df.loc[P_df['NEXT_CLUSTER']!='None']
+        a = P_df['ACTION'].nunique()
+        s = P_df['CLUSTER'].max()
+        t = P_df['NEXT_CLUSTER'].max()
+        # taking the max out of CLUSTER and NEXT_CLUSTER because 'None' values
+        # may have interfered with numbering
+        n = max(s, t)
+        P = np.zeros((a, n+1, n+1))
+        for index, row in P_df.iterrows():
+            x, y, z = int(row['ACTION']), int(row['CLUSTER']), int(row['NEXT_CLUSTER'])
+            P[x, y, z] = 1
+        
+        R = []
+        for i in range(a):
+            R.append(np.array(self.R_df))
+        R = np.array(R)
+        
+        v, pi = SolveMDP(P, R, gamma, epsilon, p, prob)
+        
+        # store values and policie s
+        self.v = v
+        self.pi = pi
+        
+        return v, pi

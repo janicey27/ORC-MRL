@@ -25,6 +25,7 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 # Set Parameters
 N = 50
 T_max = 100
+max_k = 11
 clustering = 'Agglomerative'
 n_clusters = None
 distance_threshold = 0.5
@@ -32,7 +33,6 @@ random_state = 0
 pfeatures = 2
 actions = [0, 1, 2, 3]
 h = -1
-max_k = 11
 cv = 5
 th = 0
 classification = 'DecisionTreeClassifier' 
