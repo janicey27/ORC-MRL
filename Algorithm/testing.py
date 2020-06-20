@@ -63,7 +63,8 @@ def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
 # P_df and R_df that represent the parameters of the estimated MDP
 def get_MDP(df_new):
     # removing None values when counting where clusters go
-    df0 = df_new[df_new['NEXT_CLUSTER']!='None']
+    #df0 = df_new[df_new['NEXT_CLUSTER']!='None']
+    df0 = df_new
     transition_df = df0.groupby(['CLUSTER','ACTION','NEXT_CLUSTER'])['RISK'].count()
 
     # next cluster given how most datapionts transition for the given action
@@ -121,19 +122,24 @@ def training_value_error(df_new, #Outpul of algorithm
         
         # predicting path of each ID
         while cont:
+            #if a == 'None':
+                #break
             v_true = v_true + df_new['RISK'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
-            try:
-                s = P_df.loc[s,a].values[0]
-            # error raises in case we never saw a given transition in the data
-            except TypeError:
-                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+            
             try: 
                 df_new['ID'].loc[index+t+1]
             except:
                 break
             if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
                 break
+            
+            try:
+                s = P_df.loc[s,a].values[0]
+            # error raises in case we never saw a given transition in the data
+            except TypeError:
+                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+           
             t += 1
             a = df_new['ACTION'].loc[index + t]
         if relative:
@@ -221,6 +227,7 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
 def R2_value_training(df_new):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
+    print(P_df)
     df2 = df_new.reset_index()
     df2 = df2.groupby(['ID']).first()
     N = df2.shape[0]
@@ -238,7 +245,13 @@ def R2_value_training(df_new):
         # iterating through path of ID
         while cont:
             v_true = v_true + df_new['RISK'].loc[index + t]
-
+            try: 
+                df_new['ID'].loc[index+t+1]
+            except:
+                break
+            if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
+                break
+            
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
@@ -246,12 +259,7 @@ def R2_value_training(df_new):
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_new['ACTION'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
-            try: 
-                df_new['ID'].loc[index+t+1]
-            except:
-                break
-            if df_new['ID'].loc[index+t] != df_new['ID'].loc[index+t+1]:
-                break
+            
             t += 1
         E_v = E_v + (v_true-v_estim)**2
         V_true.append(v_true)
@@ -357,12 +365,15 @@ def next_clusters(df):
 # the best decision tree, as well as other visualizations
 def decision_tree(model):
     # assumes that m.m, the prediction model, is a GridSearchCV object
-    dc = m.m.best_estimator_
+    dc = model.m.best_estimator_
     
     # creating the decision tree diagram in pdf: 
-    dot_data = tree.export_graphviz(dc, out_file=None) 
+    dot_data = tree.export_graphviz(dc, out_file=None,
+                                    filled=True, rounded=True,
+                                    special_characters=True) 
     graph = graphviz.Source(dot_data) 
     graph.render("Decision_Tree")
+    return graph
     
     
     

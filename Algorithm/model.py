@@ -97,12 +97,13 @@ class MDP_model:
                                           OutputFlag = 0,
                                           plot = plot)
         
-        # store final training error
-        self.training_error = training_error
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
         self.m = predict_cluster(self.df_trained, self.pfeatures)
+        
+        # store final training error
+        self.training_error = training_value_error(self.df_trained)
         
         # store P_df and R_df values
         P_df,R_df = get_MDP(self.df_trained)
@@ -140,6 +141,7 @@ class MDP_model:
                                 random_state=random_state)
         
         print('Clusters Initialized')
+        print(df_init)
         
         df_new,training_error,testing_error = splitter(df_init,
                                           pfeatures=self.pfeatures,
@@ -195,3 +197,26 @@ class MDP_model:
                                         s,
                                         actions)
         return v
+    
+    
+    # testing_error() takes a df_test, then computes and returns the testing 
+    # error on this trained model 
+    # YET TO TEST!!!!
+    def testing_error(self, 
+                      df_test,
+                      relative=False,
+                      h=-1):
+        
+        error = testing_value_error(df_test, 
+                            self.df_trained, 
+                            self, 
+                            self.pfeatures,
+                            relative=relative,
+                            h=h)
+        
+        return error
+    
+    
+    # solve_MDP() takes the trained model and returns the the value and policy
+    def solve_MDP():
+        pass

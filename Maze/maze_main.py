@@ -18,30 +18,43 @@ sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
 
 #from MDPtools import *
 from model import MDP_model
-from toy_functions import createSamples, fitted_Q
+from maze_functions import createSamples
 from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 50
-T = 100
+N = 10
+T_max = 50
 clustering = 'Agglomerative'
 n_clusters = None
 distance_threshold = 0.5
 random_state = 0
 pfeatures = 2
-actions = [0, 1]
+actions = [0, 1, 2, 3]
 h = -1
-max_k = 11
+max_k = 9
 cv = 5
 th = 0
 classification = 'DecisionTreeClassifier' 
-thresh = 2000 # threshold for dist when deciding risk
-r_max = 10 # max number of bands, actual number of states is r_max + 1 from sink
 
 #################################################################
 # Create or Load Data
-df = createSamples(N, T, r_max)
+
+# list of maze options to choose from:
+mazes = {1: 'maze-v0',
+         2: 'maze-sample-3x3-v0',
+         3: 'maze-random-3x3-v0',
+         4: 'maze-sample-5x5-v0',
+         5: 'maze-random-5x5-v0',
+         6: 'maze-sample-10x10-v0',
+         7: 'maze-random-10x10-v0',
+         8: 'maze-sample-100x100-v0',
+         9: 'maze-random-100x100-v0',
+         10: 'maze-random-10x10-plus-v0', # has portals 
+         11: 'maze-random-20x20-plus-v0', # has portals 
+         12: 'maze-random-30x30-plus-v0'} # has portals 
+
+df = createSamples(N, T_max, mazes[2], reseed=True)
 print(df)
 
 #################################################################
@@ -60,18 +73,5 @@ print(df)
 #     n_clusters, # number of clusters for KMeans
 #     random_state,
 #     plot=True)
+# 
 # =============================================================================
-#################################################################
-# Run Fitted_Q
-
-Q, p = fitted_Q(50, # number of iterations
-             df, # dataframe 
-             0.98, # decay factor
-             pfeatures, # number of features in dataframe
-             actions, # list of action possibilities
-             r_max = r_max, # r_max of this toy example
-             take_max = True, # True if max_cost is good, otherwise false
-             regression = 'Linear Regression') # str: type of regression
-
-x = [random.uniform(0, 10), random.uniform(0, 10)]
-p.get_action(x)
