@@ -125,7 +125,8 @@ class MDP_model:
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
             n_clusters = None, # number of clusters for KMeans
             random_state = 0,
-            plot = False):
+            plot = False,
+            optimize = True):
     
         df = data.copy()
             
@@ -156,6 +157,21 @@ class MDP_model:
         
         # store all training errors
         self.training_error = training_error
+        
+        # if optimize, find best cluster and resplit
+        if optimize: 
+            k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
+            self.opt_k = k
+            df_new,training_error,testing_error = splitter(df_init,
+                                          pfeatures=self.pfeatures,
+                                          th=th,
+                                          df_test = None,
+                                          testing = False,
+                                          max_k = self.opt_k,
+                                          classification=classification,
+                                          h=h,
+                                          OutputFlag = 0,
+                                          plot = plot)
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
