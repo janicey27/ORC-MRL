@@ -51,6 +51,7 @@ def createSamples(N, T_max, maze, reseed=False):
     # initialize environment
     env = gym.make(maze)
     transitions = []
+    l = env.maze_size[0]
     
     for i in range(N):
         
@@ -58,16 +59,18 @@ def createSamples(N, T_max, maze, reseed=False):
         offset = np.array((random.random(), random.random()))
         obs = env.reset()
         
-        # reward for SMALL 3x3 MAZE CHANGE LATER
-        reward = -0.1/(env.maze_size[0]*env.maze_size[1])
+        # initialize first reward
+        reward = -0.1/(l*l)
         x = obs + offset
+        ogc = obs[0]*l + obs[1]
         
         for t in range(T_max):
             action = env.action_space.sample()
             
-            transitions.append([i, t, x, action, reward])
+            transitions.append([i, t, x, action, reward, ogc])
             
             new_obs, reward, done, info = env.step(action)
+            ogc = new_obs[0]*l + new_obs[1]
             
             # if reseed, create new offset
             if reseed:
@@ -75,11 +78,12 @@ def createSamples(N, T_max, maze, reseed=False):
                 
             # if end state reached, append one last no action no reward
             if done:
-                transitions.append([i, t+1, new_obs+offset, 'None', reward])
+                transitions.append([i, t+1, new_obs+offset, 'None', reward, ogc])
                 break
             x = new_obs + offset
+            
     
-    df = pd.DataFrame(transitions, columns=['ID', 'TIME', 'x', 'ACTION', 'RISK'])
+    df = pd.DataFrame(transitions, columns=['ID', 'TIME', 'x', 'ACTION', 'RISK', 'OG_CLUSTER'])
                       
     features = df['x'].apply(pd.Series)
     features = features.rename(columns = lambda x : 'FEATURE_' + str(x))

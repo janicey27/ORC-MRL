@@ -241,7 +241,7 @@ def splitter(df,  # pandas dataFrame
     testing_error = []
     training_error = []
     
-    # determine if the problem is for grid example
+    # determine if the problem has OG cluster
     if 'OG_CLUSTER' in df.columns:
         grid = True
     else:
@@ -326,21 +326,20 @@ def splitter(df,  # pandas dataFrame
     ## Plotting accuracy and value R2
     its = np.arange(k+1, nc+1)
     if plot:
-        fig1, ax1 = plt.subplots()
-        ax1.plot(its, training_R2, label= "Training R2")
         if grid:
+            fig1, ax1 = plt.subplots()
+            ax1.plot(its, training_R2, label= "Training R2")
             ax1.plot(its, training_acc, label = "Training Accuracy")
-        if testing:
-            if grid:
+            if testing:
                 ax1.plot(its, testing_acc, label = "Testing Accuracy")
-            ax1.plot(its, testing_R2, label = "Testing R2")
-        if n>0:
-            ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-        ax1.set_ylim(0,1)
-        ax1.set_xlabel('# of Clusters')
-        ax1.set_ylabel('R2 or Accuracy %')
-        ax1.set_title('R2 and Accuracy During Splitting')
-        ax1.legend()
+                ax1.plot(its, testing_R2, label = "Testing R2")
+            if n>0:
+                ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+            ax1.set_ylim(0,1)
+            ax1.set_xlabel('# of Clusters')
+            ax1.set_ylabel('R2 or Accuracy %')
+            ax1.set_title('R2 and Accuracy During Splitting')
+            ax1.legend()
         ## Plotting value error E((v_est - v_true)^2)
         fig2, ax2 = plt.subplots()
         ax2.plot(its, training_error, label = "Training Error")
