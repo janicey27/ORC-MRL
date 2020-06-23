@@ -164,6 +164,12 @@ class MDP_model:
         # if optimize, find best cluster and resplit
         if optimize: 
             k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
+            for i in range(k):
+                # if clustering is less than k but error within 10^-14, take this
+                if abs(self.training_error['Error'].min() - \
+                       self.training_error.loc[self.training_error['Clusters']==i]['Error'].min()) < 1e-14:
+                    k = i
+                    break
             self.opt_k = k
             df_new,training_error,testing_error = splitter(df_init,
                                           pfeatures=self.pfeatures,

@@ -92,14 +92,15 @@ def createSamples(N, T_max, maze, reseed=False):
 
 # Initialize the "maze" environment
 # =============================================================================
+# =============================================================================
 # env = gym.make("maze-random-10x10-plus-v0")
 # obs = []
 # 
 # # first point for ID
 # observation = env.reset()
 # offset = np.array((random.random(), random.random()))
-# #env.state = offset
-# #print(env.state)
+# # #env.state = offset
+# # #print(env.state)
 # obs.append(observation+offset)
 # for _ in range(1000):
 #     
@@ -112,4 +113,5 @@ def createSamples(N, T_max, maze, reseed=False):
 #     if done:
 #       observation = env.reset()
 # env.close()
+# =============================================================================
 # =============================================================================
