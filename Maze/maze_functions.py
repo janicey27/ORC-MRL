@@ -10,9 +10,14 @@ Created on Thu Jun 18 20:57:14 2020
 import sys
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import math
 import random
 import gym
+
+import sys
+sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
+from MDPtools import *
 
 # If Spyder keeps re-calling gym_maze module, run the following code
 '''
@@ -42,11 +47,16 @@ mazes = {1: 'maze-v0',
 
 
 # createSamples() N, the number of IDs, T_max, the maximum timestep if win-
-# state is not reached, and maze (str of maze-name from above dict). If 
+# state is not reached, and maze (str of maze-name from above dict). Generates 
+# the samples based on a ratio r of randomness, and (1-r) actions taken according
+# to the optimal policy of the maze. If 
 # reseed = True, selects a random location in the next cell, otherwise reseed=
 # False makes robot travel to the next cell with the same offset
 # returns a dataframe of the form ['ID', 'TIME', features, 'ACTION', 'RISK']
-def createSamples(N, T_max, maze, reseed=False):
+def createSamples(N, T_max, maze, r, reseed=False):
+    # solving for optimal policy
+    P, R = get_maze_MDP(maze)
+    v, pi = SolveMDP(P, R, 0.98, 1e-10, False, 'max')
     
     # initialize environment
     env = gym.make(maze)
@@ -62,15 +72,19 @@ def createSamples(N, T_max, maze, reseed=False):
         # initialize first reward
         reward = -0.1/(l*l)
         x = obs + offset
-        ogc = obs[0]*l + obs[1]
+        ogc = int(obs[0] + obs[1]*l)
         
         for t in range(T_max):
-            action = env.action_space.sample()
+            # take random step or not
+            if random.random() <= r:
+                action = env.action_space.sample()
+            else:
+                action = int(pi[ogc])
             
             transitions.append([i, t, x, action, reward, ogc])
             
             new_obs, reward, done, info = env.step(action)
-            ogc = new_obs[0]*l + new_obs[1]
+            ogc = int(new_obs[0] + new_obs[1]*l)
             
             # if reseed, create new offset
             if reseed:
@@ -89,15 +103,201 @@ def createSamples(N, T_max, maze, reseed=False):
     features = features.rename(columns = lambda x : 'FEATURE_' + str(x))
     
     df_new = pd.concat([df.iloc[:, :2], features, df.iloc[:, 3:]], axis=1)
+    df_new['FEATURE_1'] = -df_new['FEATURE_1']
     
     return df_new
-                      
-    
+             
 
+# trajectory() takes a trained model, the maze used to train this model, and 
+# plots the path of the optimal solution through the maze. returns the path
+def trajectory(m, maze):
+    if m.v is None:
+        m.solve_MDP()
+    env = gym.make(maze)
+    obs = env.reset()
+    l = env.maze_size[0]
+    reward = -0.1/(l*l)
+    
+    xs = [obs[0]]
+    ys = [-obs[1]]
+    done = False
+    offset = np.array([0.5, -0.5])
+    point = np.array((obs[0], -obs[1])) + offset
+
+    while not done:
+        # find current state and action
+        s = m.m.predict(point.reshape(1, -1))
+        #print(s)
+        a = int(m.pi[s])
+        #print(a)
+        
+        obs, reward, done, info = env.step(a)
+        point = np.array((obs[0], -obs[1])) + offset
+        #print(done)
+        xs.append(obs[0])
+        ys.append(-obs[1])
+
+    xs = np.array(xs)
+    ys = np.array(ys)
+    
+    u = np.diff(xs)
+    v = np.diff(ys)
+    pos_x = xs[:-1] + u/2
+    pos_y = ys[:-1] + v/2
+    norm = np.sqrt(u**2+v**2) 
+    
+    fig, ax = plt.subplots()
+    ax.plot(xs,ys, marker="o")
+    ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
+    #ax.set_xlabel('FEATURE_%i' %f1)
+    #ax.set_ylabel('FEATURE_%i' %f2)
+    plt.show()
+    return xs, ys
+
+# opt_trajectory() takes a maze name, then solves the policy and plots the
+# optimal path through the maze. Returns the path. ONLY WORKS for deterministic
+# mazes!
+def opt_trajectory(maze):
+    P, R = get_maze_MDP(maze)
+    v, pi = SolveMDP(P, R, 0.98, 1e-10, True, 'max')
+    
+    env = gym.make(maze)
+    obs = env.reset()
+    l = env.maze_size[0]
+    reward = -0.1/(l*l)
+    
+    xs = [obs[0]]
+    ys = [-obs[1]]
+    done = False
+    
+    while not done:
+        # find current state and action
+        ogc = int(obs[0] + obs[1]*l)
+        #print(ogc)
+        a = int(pi[ogc])
+        
+        obs, reward, done, info = env.step(a)
+        #print(done)
+        xs.append(obs[0])
+        ys.append(-obs[1])
+
+    xs = np.array(xs)
+    ys = np.array(ys)
+    
+    u = np.diff(xs)
+    v = np.diff(ys)
+    pos_x = xs[:-1] + u/2
+    pos_y = ys[:-1] + v/2
+    norm = np.sqrt(u**2+v**2) 
+    
+    fig, ax = plt.subplots()
+    ax.plot(xs,ys, marker="o")
+    ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
+    #ax.set_xlabel('FEATURE_%i' %f1)
+    #ax.set_ylabel('FEATURE_%i' %f2)
+    plt.show()
+    return xs, ys
+
+# opp_action() returns the opposite action as input action
+def opp_action(a):
+    if a == 0:
+        return 1
+    elif a == 1:
+        return 0
+    elif a == 2:
+        return 3
+    elif a == 3:
+        return 2
+    
+# get_maze_MDP() takes a maze string name, and returns two matrices, P and R, 
+# which describe the MDP of the maze
+def get_maze_MDP(maze):
+    # initialize maze
+    env = gym.make(maze)
+    obs = env.reset()
+    l = env.maze_size[0]
+    
+    # initialize matrices
+    a = 4
+    P = np.zeros((a, l*l, l*l))
+    R = np.zeros((a, l*l))
+    
+    # store clusters seen and cluster/action pairs seen in set
+    c_seen = set()
+    ca_seen = set()
+    
+    # initialize env, set reward of original
+    obs = env.reset()
+    ogc = int(obs[0] + obs[1]*l)
+    reward = -0.1/(l*l)
+    
+    while len(ca_seen) < 4*l*l:
+        # update rewards for new cluster
+        if ogc not in c_seen:
+            for i in range(a):
+                R[i, ogc] = reward
+            c_seen.add(ogc)
+        
+        stop = False
+        for i in range(a):
+            if (ogc, i) not in ca_seen:
+                ca_seen.add((ogc, i))
+                #print(len(ca_seen))
+                new_obs, reward, done, info = env.step(i)
+                ogc_new = int(new_obs[0] + new_obs[1]*l)
+                # update probabilities
+                P[i, ogc, ogc_new] = 1
+                if ogc != ogc_new:
+                    P[opp_action(i), ogc_new, ogc] = 1
+                    ca_seen.add((ogc_new, opp_action(i)))
+                    #print(len(ca_seen))
+                ogc = ogc_new
+                
+                if done:
+                    obs = env.reset()
+                    ogc = int(obs[0] + obs[1]*l)
+                
+                stop = True
+            if stop:
+                break
+        
+        # if all seen already, take random step 
+        if not stop:
+            action = env.action_space.sample()
+            new_obs, reward, done, info = env.step(action)
+            ogc = int(new_obs[0] + new_obs[1]*l)
+            #print('trying random action', ogc)
+
+    return P, R
+
+
+# plot_paths() takes a dataframe with 'FEATURE_1' and 'FEATURE_2', and plots
+# the first n paths (by ID). returns nothing
+def plot_paths(df, n): 
+    fig, ax = plt.subplots()
+    
+    for i in range(n):
+        x = df.loc[df['ID']==i]['FEATURE_0']
+        y = -df.loc[df['ID']==i]['FEATURE_1']
+        xs = np.array(x)
+        ys = np.array(y)
+        
+        u = np.diff(xs)
+        v = np.diff(ys)
+        pos_x = xs[:-1] + u/2
+        pos_y = ys[:-1] + v/2
+        norm = np.sqrt(u**2+v**2) 
+        
+        ax.plot(xs,ys, marker="o")
+        ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
+    
+    plt.show()
+    return
+        
 # Initialize the "maze" environment
 # =============================================================================
 # =============================================================================
-# env = gym.make("maze-random-10x10-plus-v0")
+# env = gym.make(mazes[4])
 # obs = []
 # 
 # # first point for ID
@@ -106,6 +306,7 @@ def createSamples(N, T_max, maze, reseed=False):
 # # #env.state = offset
 # # #print(env.state)
 # obs.append(observation+offset)
+# 
 # for _ in range(1000):
 #     
 #     env.render()
@@ -118,4 +319,5 @@ def createSamples(N, T_max, maze, reseed=False):
 #       observation = env.reset()
 # env.close()
 # =============================================================================
+
 # =============================================================================

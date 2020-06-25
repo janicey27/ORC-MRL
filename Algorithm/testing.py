@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import graphviz
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn import tree
 #################################################################
@@ -63,8 +64,8 @@ def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
 # P_df and R_df that represent the parameters of the estimated MDP
 def get_MDP(df_new):
     # removing None values when counting where clusters go
-    #df0 = df_new[df_new['NEXT_CLUSTER']!='None']
-    df0 = df_new
+    df0 = df_new[df_new['NEXT_CLUSTER']!='None']
+    #df0 = df_new
     transition_df = df0.groupby(['CLUSTER','ACTION','NEXT_CLUSTER'])['RISK'].count()
 
     # next cluster given how most datapionts transition for the given action

@@ -18,14 +18,14 @@ sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
 
 #from MDPtools import *
 from model import MDP_model
-from maze_functions import createSamples
+from maze_functions import createSamples, trajectory
 from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
 N = 50
-T_max = 100
-max_k = 11
+T_max = 20
+max_k = 25
 clustering = 'Agglomerative'
 n_clusters = None
 distance_threshold = 0.5
@@ -35,7 +35,9 @@ actions = [0, 1, 2, 3]
 h = -1
 cv = 5
 th = 0
-classification = 'DecisionTreeClassifier' 
+#classification = 'DecisionTreeClassifier'
+classification = 'RandomForestClassifier'
+
 
 #################################################################
 # Create or Load Data
@@ -54,13 +56,14 @@ mazes = {1: 'maze-v0',
          11: 'maze-random-20x20-plus-v0', # has portals 
          12: 'maze-random-30x30-plus-v0'} # has portals 
 
-df = createSamples(N, T_max, mazes[2], reseed=True)
+df = createSamples(N, T_max, mazes[4], 0.50, reseed=True)
 print(df)
 
 #################################################################
 # Run Algorithm
-m = MDP_model()
-m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+'''
+m2 = MDP_model()
+m2.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
     max_k, # int: number of iterations
@@ -73,4 +76,4 @@ m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', '
     random_state,
     plot=True,
     optimize=True)
-
+'''

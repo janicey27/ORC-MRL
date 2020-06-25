@@ -32,6 +32,8 @@ class MDP_model:
         self.R_df = None # Reward function of the learnt MDP
         self.v = None # value after MDP solved
         self.pi = None # policy after MDP solved
+        self.P = None # P_df but in matrix form of P[a, s, s']
+        self.R = None # R_df but in matrix form of R[a, s]
         
         
     # fit_CV() takes in parameters for prediction, and trains the model on the 
@@ -144,6 +146,8 @@ class MDP_model:
                                 distance_threshold = distance_threshold,
                                 random_state=random_state)
         
+        # change end state to 'end'
+        df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
         print('Clusters Initialized')
         print(df_init)
         
@@ -253,27 +257,45 @@ class MDP_model:
         
         P_df = self.P_df.reset_index()
         #print(P_df)
-        P_df = P_df.loc[P_df['NEXT_CLUSTER']!='None']
+        #P_df = P_df.loc[P_df['NEXT_CLUSTER']!='None']
         a = P_df['ACTION'].nunique()
-        s = P_df['CLUSTER'].max()
-        t = P_df['NEXT_CLUSTER'].max()
-        # taking the max out of CLUSTER and NEXT_CLUSTER because 'None' values
-        # may have interfered with numbering
-        n = max(s, t)
-        P = np.zeros((a, n+1, n+1))
+        s = P_df['CLUSTER'].nunique()
+        
+        # if 'None'/end-state exists, create additional cluster
+        if 'None' in P_df['ACTION'].unique():
+            end_state = True
+            a -= 1
+            s += 1
+        else:
+            end_state = False
+        
+        P = np.zeros((a, s, s))
         for index, row in P_df.iterrows():
-            x, y, z = int(row['ACTION']), int(row['CLUSTER']), int(row['NEXT_CLUSTER'])
-            P[x, y, z] = 1
+            x, y, z = row['ACTION'], int(row['CLUSTER']), row['NEXT_CLUSTER']
+            if x == 'None':
+                for i in range(a):
+                    P[i, y, s-1] = 1
+            else:
+                P[int(x), y, int(z)] = 1
+                
+        if end_state:
+            for i in range(a):
+                P[i, s-1, s-1] = 1
         
         R = []
         for i in range(a):
-            R.append(np.array(self.R_df))
+            if end_state:
+                R.append(np.append(np.array(self.R_df),0))
+            else:
+                R.append(np.array(self.R_df))
         R = np.array(R)
         
         v, pi = SolveMDP(P, R, gamma, epsilon, p, prob)
         
-        # store values and policie s
+        # store values and policies and matrices
         self.v = v
         self.pi = pi
+        self.P = P
+        self.R = R
         
         return v, pi

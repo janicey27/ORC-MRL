@@ -23,7 +23,8 @@ from sklearn.cluster import KMeans, AgglomerativeClustering, Birch
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import GridSearchCV, GroupKFold
 #from xgboost import XGBClassifier
 from collections import Counter
@@ -174,7 +175,7 @@ def split(df,  # pandas dataFrame
     elif classification == 'LogisticRegressionCV':
         m = LogisticRegressionCV()
     elif classification == 'DecisionTreeClassifier':
-        m = DecisionTreeClassifier()
+        m = DecisionTreeClassifier(max_depth=4)
 #        params = {
 #        'max_depth': [3, 4, 6, 10,None]
 #        }
@@ -183,6 +184,10 @@ def split(df,  # pandas dataFrame
         m = RandomForestClassifier()
     #elif classification == 'XGBClassifier':
         #m = XGBClassifier()        
+    elif classification == 'MLPClassifier':
+        m = MLPClassifier(hidden_layer_sizes=(100,100,100),max_iter=300)
+    elif classification == 'AdaBoostClassifier':
+        m = AdaBoostClassifier()
     else:
         m = LogisticRegression(solver='liblinear')
     
