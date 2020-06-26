@@ -250,6 +250,8 @@ def get_maze_MDP(maze):
     
     # initialize matrices
     a = 4
+    #P = np.zeros((a, l*l+1, l*l+1))
+    #R = np.zeros((a, l*l+1))
     P = np.zeros((a, l*l, l*l))
     R = np.zeros((a, l*l))
     
@@ -278,13 +280,24 @@ def get_maze_MDP(maze):
                 ogc_new = int(new_obs[0] + new_obs[1]*l)
                 # update probabilities
                 P[i, ogc, ogc_new] = 1
-                if ogc != ogc_new:
-                    P[opp_action(i), ogc_new, ogc] = 1
-                    ca_seen.add((ogc_new, opp_action(i)))
+                #print('updated', ogc, ogc_new, done)
+                if not done:
+                    if ogc != ogc_new:
+                        P[opp_action(i), ogc_new, ogc] = 1
+                        #print('updated', ogc_new, ogc)
+                        ca_seen.add((ogc_new, opp_action(i)))
                     #print(len(ca_seen))
                 ogc = ogc_new
+                #print('new ogc', ogc, done)
                 
                 if done:
+                    #print('reset here')
+                    # set next state to sink
+                    #P[i, ogc_new] = np.zeros(l*l+1)
+                    #for i in range(a):
+                        #P[i, ogc_new, l*l] = 1
+                        #P[i, l*l, l*l] = 1
+                        #R[i, l*l] = 0
                     obs = env.reset()
                     ogc = int(obs[0] + obs[1]*l)
                 
@@ -298,6 +311,8 @@ def get_maze_MDP(maze):
             new_obs, reward, done, info = env.step(action)
             ogc = int(new_obs[0] + new_obs[1]*l)
             #print('trying random action', ogc)
+            #if done:
+                
 
     return P, R
 

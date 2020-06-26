@@ -335,7 +335,7 @@ def plot_features(df, x, y, c='CLUSTER'):
     df.plot.scatter(x=x,
                       y=y,
                       c=c,
-                      colormap='viridis')
+                      colormap='tab20')
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
     plt.show()
