@@ -80,7 +80,10 @@ def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
     else:
         output = LabelEncoder().fit_transform(np.array(df.RISK).reshape(-1, 1))
     df['CLUSTER'] = output
+    df['CLUSTER'] = df['CLUSTER'].astype(int)
     df['NEXT_CLUSTER'] = df['CLUSTER'].shift(-1)
+    df.loc[df['ID'] != df['ID'].shift(-1), 'NEXT_CLUSTER'] = 0
+    df['NEXT_CLUSTER'] = df['NEXT_CLUSTER'].astype(int)
     df.loc[df['ID'] != df['ID'].shift(-1), 'NEXT_CLUSTER'] = 'None'
     return(df)
 #################################################################

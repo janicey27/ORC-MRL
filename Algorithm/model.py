@@ -15,7 +15,7 @@ import numpy as np
 
 from clustering import fit_CV, initializeClusters, splitter
 from testing import predict_cluster, training_value_error, get_MDP, \
-        predict_value_of_cluster
+        predict_value_of_cluster, testing_value_error
 from MDPtools import SolveMDP
 #################################################################
 
@@ -278,12 +278,12 @@ class MDP_model:
         
         P = np.zeros((a, s, s))
         for index, row in P_df.iterrows():
-            x, y, z = row['ACTION'], int(row['CLUSTER']), row['NEXT_CLUSTER']
+            x, y, z = row['ACTION'], row['CLUSTER'], row['NEXT_CLUSTER']
             if x == 'None':
                 for i in range(a):
                     P[i, y, s-1] = 1
             else:
-                P[int(x), y, int(z)] = 1
+                P[x, y, z] = 1
                 
         if end_state:
             for i in range(a):
