@@ -95,6 +95,13 @@ def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
 # findConstradiction() takes as input a dataframe and returns the tuple with
 # initial cluster and action that have the most number of contradictions or
 # (-1, -1) if no such cluster existss
+# METHOD FOR FINDIND CONTRADICTION:
+#METHOD1: Let s,a be a state action pair. We count the number of occurences of 
+# diffrent NEXT_CLUSTERS under action a starting from s. Let s' be NEXT_CLUSTER
+# Most elements from s went to under a. Let n2 be the number of elements that
+# didn't go to s' under a. We chose (s,a) to maximize n2.
+# METHOD2: Here n2 is chosen as the number of elements that went to the second
+# most frequent NEXT_CLUSTER.
 def findContradiction(df, # pandas dataFrame
                       th): # integer: threshold split size
     X = df.loc[:, ['CLUSTER', 'NEXT_CLUSTER', 'ACTION']]
@@ -102,10 +109,17 @@ def findContradiction(df, # pandas dataFrame
     count = X.groupby(['CLUSTER', 'ACTION'])['NEXT_CLUSTER'].nunique()
     contradictions = list(count[list(count > 1)].index)
     
+#    #METHOD 1 
+#    if len(contradictions) > 0:
+#        ncontradictions = [sum(list(X.query('CLUSTER == @i[0]').query(
+#                'ACTION == @i[1]').groupby('NEXT_CLUSTER')['ACTION'].count().
+#            sort_values(ascending=False).ravel())[1:]) for i in contradictions]
+    
+    #METHOD 2
     if len(contradictions) > 0:
         ncontradictions = [sum(list(X.query('CLUSTER == @i[0]').query(
                 'ACTION == @i[1]').groupby('NEXT_CLUSTER')['ACTION'].count().
-            sort_values(ascending=False).ravel())[1:]) for i in contradictions]
+            sort_values(ascending=False).ravel())[1:2]) for i in contradictions]
         if max(ncontradictions) > th:
             selectedCont = contradictions[ncontradictions.index(
                     max(ncontradictions))]
