@@ -36,6 +36,7 @@ max_k = 2
 cv = 5
 th = 0
 classification = 'DecisionTreeClassifier' 
+split_classifier_params = {'random_state':0}
 thresh = 2000 # threshold for dist when deciding risk
 
 #################################################################
@@ -56,6 +57,7 @@ m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', '
     cv, # number for cross validation
     th, # splitting threshold
     classification, # classification method
+    split_classifier_params, # classification parameters
     clustering,# clustering method from Agglomerative, KMeans, and Birch
     n_clusters, # number of clusters for KMeans
     random_state,

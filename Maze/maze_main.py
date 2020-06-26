@@ -18,7 +18,7 @@ sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
 
 #from MDPtools import *
 from model import MDP_model
-from maze_functions import createSamples, trajectory
+from maze_functions import createSamples, opt_maze_trajectory, opt_model_trajectory
 from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
@@ -37,6 +37,7 @@ cv = 5
 th = 0
 #classification = 'DecisionTreeClassifier'
 classification = 'RandomForestClassifier'
+split_classifier_params = {'random_state':0}
 
 
 #################################################################
@@ -71,6 +72,7 @@ m2.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 
     cv, # number for cross validation
     th, # splitting threshold
     classification, # classification method
+    split_classifier_params, # classification params
     clustering,# clustering method from Agglomerative, KMeans, and Birch
     n_clusters, # number of clusters for KMeans
     random_state,

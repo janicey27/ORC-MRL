@@ -10,11 +10,11 @@ Created on Wed Jun  3 13:47:27 2020
 import numpy as np
 import pandas as pd
 import random
-#from tqdm import tqdm
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
-from scipy.spatial import distance
 #################################################################
 
 # f() takes in x (the features T1 to E), the action pair u = (u1,u2) (u1=1 when 
@@ -148,15 +148,14 @@ print('cost-state:', c_r(x))
 
 
 # fitted_Q() trains K functions Q1 to QK that determine the optimal strategy
-# x_df is a dataframe of the form ['x_t', 'u', 'x_t2', 'c'] for each one-step transition
-# returns the last iteration QK, and a function policy that takes a state and
-# outputs the optimal action
+# x_df is a dataframe of the form ['x_t', 'u', 'x_t2', 'c', 'a0', 'a1', 'a2', 'a3'] 
+# for each one-step transition returns the last iteration QK, and a function \
+# policy that takes a state and outputs the optimal action
 def fitted_Q(K, x_df, gamma):
     
     x_df = x_df.copy(deep=True)
     # initialize storage and actions
-    Qs = []
-    Us = [(0, 0), (0, 1), (1, 0), (1, 1)]
+    #Qs = []
     
     # create the first Q1 function
     class Q:
@@ -164,49 +163,74 @@ def fitted_Q(K, x_df, gamma):
             x = array[0][:6]
             u = array[0][6:]
             return c_a(x, u)
-    Q1 = Q()
-    Qs.append(Q1)
+    Q_new = Q()
+    #Qs.append(Q_new)
     
     # create X using x_t and u
     # select (x_t, u) pair as training
     X = x_df['x_t'].apply(pd.Series).merge(x_df['u'].apply(pd.Series), \
                 left_index = True, right_index = True) 
-    print('New training features')
-    print(X)
+    print('New training features', flush=True)
+    print(X, flush=True)
     
     
-    #bar = tqdm(range(K))
-    bar = range(K)
+    bar = tqdm(range(K))
+    #bar = range(K)
     #creating new Qk functions
     for i in bar:
-        #print('starting')
-        # THIS IS the slowest part!! going through each line and predicting
-        # 4 things (especially slow for random forest)
         # create y using Qk-1 and x_t2
-        y = x_df.apply(lambda x: x.c + gamma*min([Qs[-1].predict([f]) \
+        # non-DP
+        y = x_df.apply(lambda x: x.c + gamma*min([Q_new.predict([f]) \
                                 for f in [np.array(x.a0), np.array(x.a1), \
                                           np.array(x.a2), np.array(x.a3)]]), axis=1)
-                                          
-        #y = x_df.apply(lambda x: x.c + gamma*min([#Qs[-1].predict(np.array(x.a0)), \
-                                                  #Qs[-1].predict(np.array(x.a1)), \
-                                                  #Qs[-1].predict(np.array(x.a2)), \
-                                    #Qs[-1].predict(np.array(x.a3).reshape(1, -1))]), axis=1)
-        #print(y)
         
+        '''                               
+        # initialize dp
+        memo = {}
+        mu = 0
+        y = []                        
+        for index, row in x_df.iterrows():
+            qs = []
+            for f in [row['a0'], row['a1'], row['a2'], row['a3']]:
+                if f in memo:
+                    qs.append(memo[f])
+                    #print('memo used')
+                    mu += 1
+                else:
+                    q = Q_new.predict([f])
+                    memo[f] = q
+                    qs.append(memo[f])
+            y.append(row['c'] + gamma*min(qs))
+        '''
+        #print(y)
+        y = np.array(y)
         # train the actual Regression function as Qk
         #regr = MLPRegressor(random_state=1, max_iter=500).fit(X, y)
         #regr = LinearRegression().fit(X, y)
         #regr = RandomForestRegressor(max_depth=2, random_state=0).fit(X, y)
-        regr = ExtraTreesRegressor(n_estimators=50).fit(X,y)
-        Qs.append(regr)
+        regr = ExtraTreesRegressor(n_estimators=50).fit(X,y.ravel())
+        #Qs.append(regr)
+        Q_new = regr
+        #print('memo size', len(memo), 'used', mu, flush=True)
         
     
-    QK = Qs[-1]
+    #QK = Qs[-1]
+    QK = Q_new
     
     p = policy()
     p.fit(QK)
         
-    return QK, p, Qs
+    return QK, p#, Qs
+
+
+# predict() takes the current Q 
+def predict(Q, f, memo):
+    if f in memo: 
+        return memo[f]
+    else:
+        q = Q.predict([f])
+        memo[f] = q
+        return q
 
 
 # get_policy() takes in a QK function (last learned function from fitted-Q), 
@@ -337,7 +361,123 @@ def convert(u):
         return Us[u]
     else:
         return Us.index(u)
+    
+# J() calculates the converging cost given a policy and N from a trained fitted Q
+def J(x, policy, T, gamma):
+    total = 0
+    a = policy.get_action(x)
+    for i in range(T):
+        total += (gamma**i)*c_a(x, a)
+        x = f(x, a, 5)
+        a = policy.get_action(x)
+    return total
+
+
+# trajectory() takes two features (from 0 to 5), and a list of actions (0 to 3),
+# and plots the trajectories (on a log10 scale) of the two features given 
+# these actions. Returns the lists of points xs, and ys
+def trajectory(f1, f2, actions):
+    x = (163573, 5, 11945, 46, 63919, 24)
+    healthy = (967839, 621, 76, 6, 415, 353108)
+    
+    xs = [np.log10(x[f1])]
+    ys = [np.log10(x[f2])]
+    for a in actions:
+        xt = f(x, convert(a), 5)
+        xs.append(np.log10(xt[f1]))
+        ys.append(np.log10(xt[f2]))
+        x = xt
+    #print(xs[:10])
+    #print(ys[:10])
+    print('last:', xs[-1], ys[-1])
+    print('healthy:', np.log10(healthy[f1]), np.log10(healthy[f2]))
+    xs = np.array(xs)
+    ys = np.array(ys)
+    
+    u = np.diff(xs)
+    v = np.diff(ys)
+    pos_x = xs[:-1] + u/2
+    pos_y = ys[:-1] + v/2
+    norm = np.sqrt(u**2+v**2) 
+    
+    fig, ax = plt.subplots()
+    ax.plot(xs,ys, marker="o")
+    ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
+    ax.set_xlabel('FEATURE_%i' %f1)
+    ax.set_ylabel('FEATURE_%i' %f2)
+    plt.show()
+    return xs, ys
+    
+
+# distance() takes a state x and a percentage error eps, and 
+# returns True if x is within eps of healthy state for all 6 features
+def distance(x, eps):
+    healthy = (967839, 621, 76, 6, 415, 353108)
+    h = True
+    for i in range(6): 
+        if abs(healthy[i] - x[i]) > healthy[i]*eps:
+            h = False
+            break
+    return h
+
+# distance_df() takes a dataframe and and epsilon, and returns a dataframe
+# of True/Falses as well as the count of each
+def distance_df(df, eps):
+    '''
+    dfx = df['x_t']
+    count = 0 
+    for x in dfx:
+        y = distance(x, eps)
+        dfx['within '+str(eps)] = y
+        if y:
+            count += 1
+    '''
+    df[str(eps)] = df.apply(lambda x: distance(x.x_t, eps),axis=1)
+    count = df.loc[df[str(eps)]==True]['x_t'].count()
+    return count, df
         
+# plot_counts() takes a dataframe and a list of epsilons to try, and plots
+# epsilons with the number of datapoints from df that are withing epsilon
+def plot_counts(df, eps_list):
+    counts = []
+    for ep in eps_list:
+        count, df = distance_df(df, ep)
+        counts.append(count)
+    fig, ax = plt.subplots()
+    ax.plot(eps_list, counts)
+    ax.set_xlabel('Epsilon')
+    ax.set_ylabel('# of Datapoints')
+    ax.title.set_text('Number of datapoints within various Epsilons of Healthy State')
+    plt.show()
+    return counts
+    
+# min_distance() takes a dataframe of that has an x_t column, and returns the 
+# minimum distance (percentage) of the closest point to healthy state, as well
+# as the index of this occurance
+def min_distance(df):
+    #healthy = (967839, 621, 76, 6, 415, 353108)
+    dfx = df['x_t']
+    
+    min_d = float('inf')
+    loc = None
+    for i in range(len(dfx)): 
+        d = get_dist(dfx[i])
+        if d < min_d:
+            min_d = d
+            loc = i
+            
+    return min_d, loc
+        
+# get_dist() gets the distance of a datapoint from the healthy state
+def get_dist(x):
+    healthy = (967839, 621, 76, 6, 415, 353108)
+    max_d = 0
+    for i in range(6):
+        d = abs(healthy[i] - x[i])/healthy[i]
+        if d > max_d:
+            max_d = d
+    return max_d
+    
 #################################################################
 # Running the experiment
 '''

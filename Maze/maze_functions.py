@@ -17,7 +17,7 @@ import gym
 
 import sys
 sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
-from MDPtools import *
+from MDPtools import SolveMDP
 
 # If Spyder keeps re-calling gym_maze module, run the following code
 '''
@@ -108,9 +108,9 @@ def createSamples(N, T_max, maze, r, reseed=False):
     return df_new
              
 
-# trajectory() takes a trained model, the maze used to train this model, and 
+# opt_model_trajectory() takes a trained model, the maze used to train this model, and 
 # plots the path of the optimal solution through the maze. returns the path
-def trajectory(m, maze):
+def opt_model_trajectory(m, maze):
     if m.v is None:
         m.solve_MDP()
     env = gym.make(maze)
@@ -121,7 +121,8 @@ def trajectory(m, maze):
     xs = [obs[0]]
     ys = [-obs[1]]
     done = False
-    offset = np.array([0.5, -0.5])
+    #offset = np.array([0.5, -0.5])
+    offset = np.array((random.random(), random.random()))
     point = np.array((obs[0], -obs[1])) + offset
 
     while not done:
@@ -132,6 +133,7 @@ def trajectory(m, maze):
         #print(a)
         
         obs, reward, done, info = env.step(a)
+        offset = np.array((random.random(), random.random()))
         point = np.array((obs[0], -obs[1])) + offset
         #print(done)
         xs.append(obs[0])
@@ -151,13 +153,42 @@ def trajectory(m, maze):
     ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
     #ax.set_xlabel('FEATURE_%i' %f1)
     #ax.set_ylabel('FEATURE_%i' %f2)
+    plt.ylim(-l+0.5, 0.5)
+    plt.xlim(-.5, l-0.5)
     plt.show()
     return xs, ys
 
-# opt_trajectory() takes a maze name, then solves the policy and plots the
+
+# policy_accuracy() takes a trained model and a maze, compares every line of 
+# the original dataset to the real optimal policy and the model's optimal policy, 
+# then returns the percentage correct from the model
+def policy_accuracy(m, maze):
+    if m.v is None:
+        m.solve_MDP()
+        
+    # finding the true optimal: 
+    P, R = get_maze_MDP(maze)
+    true_v, true_pi = SolveMDP(P, R, 0.98, 1e-10, True, 'max')
+    
+    correct = 0
+    # iterating through every line and comparing 
+    for index, row in m.df.iterrows():
+        # predicted action: 
+        s = m.m.predict(np.array(row[2:2+m.pfeatures]).reshape(1,-1))
+        #s = m.df_trained.iloc[index]['CLUSTER']
+        a = m.pi[s]
+        
+        # real action:
+        a_true = true_pi[row['OG_CLUSTER']]
+        if a == a_true:
+            correct += 1
+    total = m.df.shape[0]
+    return correct/total
+
+# opt_maze_trajectory() takes a maze name, then solves the policy and plots the
 # optimal path through the maze. Returns the path. ONLY WORKS for deterministic
 # mazes!
-def opt_trajectory(maze):
+def opt_maze_trajectory(maze):
     P, R = get_maze_MDP(maze)
     v, pi = SolveMDP(P, R, 0.98, 1e-10, True, 'max')
     

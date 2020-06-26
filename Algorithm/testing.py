@@ -376,7 +376,51 @@ def decision_tree(model):
     graph.render("Decision_Tree")
     return graph
     
+
+# NOT TESTED YET! TEST ON HIV WHEN MODEL TRAINED!
+# opt_model_trajectory() takes a trained model, the real transition function of
+# the model f(x, u), the initial state x, and plots how the model's optimal 
+# policy looks like on the start state according to f1 and f2 two features 
+# indices e.g. x[f1] x[f2] plotted on the x and y axes, for n steps
+def opt_model_trajectory(m, f, x, f1, f2, n):
+    if m.v is None:
+        m.solve_MDP()
     
+    xs = [x[f1]]
+    ys = [x[f2]]
+
+    for i in range(n):
+        # find current state and action
+        s = m.m.predict(np.array(x).reshape(1, -1))
+        #print(s)
+        a = int(m.pi[s])
+        #print(a)
+        x_new = f(x, a)
+        
+        xs.append(x_new[f1])
+        ys.append(x_new[f2])
+        x = x_new
+
+    xs = np.array(xs)
+    ys = np.array(ys)
+    
+    u = np.diff(xs)
+    v = np.diff(ys)
+    pos_x = xs[:-1] + u/2
+    pos_y = ys[:-1] + v/2
+    norm = np.sqrt(u**2+v**2) 
+    
+    fig, ax = plt.subplots()
+    ax.plot(xs,ys, marker="o")
+    ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
+    #ax.set_xlabel('FEATURE_%i' %f1)
+    #ax.set_ylabel('FEATURE_%i' %f2)
+    
+    # set plot limits if relevant
+    #plt.ylim(-l+0.5, 0.5)
+    #plt.xlim(-.5, l-0.5)
+    plt.show()
+    return xs, ys
     
 #################################################################
     

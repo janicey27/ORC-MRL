@@ -13,7 +13,7 @@ Created on Sun Mar  1 18:48:20 2020
 # Load Libraries
 import pandas as pd
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import random
 from datetime import datetime
 from tqdm import tqdm #progress bar
@@ -25,13 +25,14 @@ from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import GridSearchCV, GroupKFold
+from sklearn.model_selection import GroupKFold
 #from xgboost import XGBClassifier
 from collections import Counter
 from itertools import groupby
 from operator import itemgetter
 
-from testing import *
+from testing import R2_value_training, training_value_error, training_accuracy, \
+    predict_cluster, R2_value_testing, testing_value_error, testing_accuracy
 #################################################################
 
 
@@ -143,7 +144,8 @@ def split(df,  # pandas dataFrame
           c,  # integer: target cluster
           pfeatures,  # integer: number of features
           k,  # integer: intedexer for next cluster
-          classification='LogisticRegression'):  # string: classification aglo
+          classification='LogisticRegression', # string: classification aglo
+          split_classifier_params={'random_state':0}): # dict: of classifier params
 
     g1 = df[(df['CLUSTER'] == i) & (
             df['ACTION'] == a) & (df['NEXT_CLUSTER'] == c)]
@@ -171,25 +173,25 @@ def split(df,  # pandas dataFrame
     tr_y = training.iloc[:, -1:]
 
     if classification == 'LogisticRegression':
-        m = LogisticRegression(solver='liblinear')
+        m = LogisticRegression(**split_classifier_params)
     elif classification == 'LogisticRegressionCV':
-        m = LogisticRegressionCV()
+        m = LogisticRegressionCV(**split_classifier_params)
     elif classification == 'DecisionTreeClassifier':
-        m = DecisionTreeClassifier(max_depth=4)
+        m = DecisionTreeClassifier(**split_classifier_params)
 #        params = {
 #        'max_depth': [3, 4, 6, 10,None]
 #        }
 #        m = GridSearchCV(m, params,cv = 5)
     elif classification == 'RandomForestClassifier':
-        m = RandomForestClassifier()
+        m = RandomForestClassifier(**split_classifier_params)
     #elif classification == 'XGBClassifier':
         #m = XGBClassifier()        
     elif classification == 'MLPClassifier':
-        m = MLPClassifier(hidden_layer_sizes=(100,100,100),max_iter=300)
+        m = MLPClassifier(**split_classifier_params)
     elif classification == 'AdaBoostClassifier':
-        m = AdaBoostClassifier()
+        m = AdaBoostClassifier(**split_classifier_params)
     else:
-        m = LogisticRegression(solver='liblinear')
+        m = LogisticRegression(**split_classifier_params)
     
     
     m.fit(tr_X, tr_y.values.ravel())
@@ -234,6 +236,7 @@ def splitter(df,  # pandas dataFrame
              testing = False, # True if we are cross validating
              max_k = 6, # int: max number of clusters
              classification='LogisticRegression',  # string: classification alg
+             split_classifier_params = {'random_state':0}, # dict: classification params
              h=5,
              OutputFlag = 1,
              n=-1,
@@ -276,7 +279,7 @@ def splitter(df,  # pandas dataFrame
             
             if OutputFlag == 1:
                 print('Cluster splitted', c,'| Action causing contradiction:', a, '| Cluster most elements went to:', b)
-            df_new = split(df_new, c, a, b, pfeatures, nc, classification)
+            df_new = split(df_new, c, a, b, pfeatures, nc, classification,split_classifier_params)
             
             # error and accuracy calculations
             
@@ -379,6 +382,7 @@ def fit_CV(df,
           clustering,
           distance_threshold,
           classification,
+          split_classifier_params,
           max_k,
           n_clusters,
           random_state,
@@ -427,6 +431,7 @@ def fit_CV(df,
                                           testing = True,
                                           max_k = max_k,
                                           classification = classification,
+                                          split_classifier_params = split_classifier_params,
                                           h = h, 
                                           OutputFlag = 0,
                                           n=n,

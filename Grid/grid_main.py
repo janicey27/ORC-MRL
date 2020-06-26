@@ -27,9 +27,8 @@ from MDPtools import Generate_random_MDP, sample_MDP_with_features_list
 #################################################################
 # Load Libraries
 
-from clustering import initializeClusters, splitter, split_train_test_by_id
-from testing import *
-from grid_functions import * 
+from testing import purity, plot_features, next_clusters
+from grid_functions import UnifNormal, transformSamples
 # find a way to import grid_functions into the actual model which calls on splitter.......
 #################################################################
 
@@ -49,6 +48,7 @@ clustering = 'Agglomerative'
 n_clusters = None # for KMeans
 random_state = 0
 classification = 'DecisionTreeClassifier'
+split_classifier_params = {'random_state':0}
 max_k = 15
 th = 0 #int(0.1*N*(T-1)/n) #Threshold to stop splitting
 ratio = 0.3 # portion of data to be used for testing
@@ -107,42 +107,8 @@ m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK'
     cv, # number for cross validation
     th, # splitting threshold
     classification, # classification method
+    split_classifier_params,
     clustering,# clustering method from Agglomerative, KMeans, and Birch
     n_clusters, # number of clusters for KMeans
     random_state,
     plot=True)
-
-'''
-df_train, df_test = split_train_test_by_id(df, ratio, 'ID')
-#################################################################
-# Initialize Clusters
-df = initializeClusters(df_train,
-                        clustering=clustering,
-                        n_clusters=n_clusters,
-                        random_state=random_state)
-#################################################################
-
-#################################################################
-# Run Iterative Learning Algorithm
-
-df_new,training_R2,testing_R2 = splitter(df,
-                                  pfeatures,
-                                  th,
-                                  df_test,
-                                  classification,
-                                  n_iter,
-                                  OutputFlag = 0,
-                                  n=n)
-
-#################################################################
-
-#print(purity(df_new))
-#plot_features(df)
-model = predict_cluster(df_new, pfeatures)
-
-print('training accuracy:',training_accuracy(df_new)[0])
-print('training error:', training_value_error(df_new))
-print('testing error:', testing_value_error(df_test, df_new, model, pfeatures))
-print('training R2:', R2_value_training(df_new))
-print('testing R2:', R2_value_testing(df_test, df_new, model, pfeatures))
-'''

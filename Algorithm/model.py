@@ -13,9 +13,10 @@ Model Class that runs the Iterative Clustering algorithm on any data.
 import pandas as pd
 import numpy as np
 
-from clustering import *
-from testing import *
-from MDPtools import *
+from clustering import fit_CV, initializeClusters, splitter
+from testing import predict_cluster, training_value_error, get_MDP, \
+        predict_value_of_cluster
+from MDPtools import SolveMDP
 #################################################################
 
 class MDP_model:
@@ -48,6 +49,7 @@ class MDP_model:
             cv=5, # number for cross validation
             th=0, # splitting threshold
             classification = 'DecisionTreeClassifier', # classification method
+            split_classifier_params = {'random_state': 0},
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
             n_clusters = None, # number of clusters for KMeans
             random_state = 0,
@@ -66,6 +68,7 @@ class MDP_model:
                                                   clustering,
                                                   distance_threshold,
                                                   classification,
+                                                  split_classifier_params,
                                                   max_k,
                                                   n_clusters,
                                                   random_state,
@@ -98,6 +101,7 @@ class MDP_model:
                                           testing = False,
                                           max_k = self.opt_k,
                                           classification=classification,
+                                          split_classifier_params = split_classifier_params,
                                           h=h,
                                           OutputFlag = 0,
                                           plot = plot)
@@ -127,6 +131,7 @@ class MDP_model:
             cv=5, # number for cross validation
             th=0, # splitting threshold
             classification = 'DecisionTreeClassifier', # classification method
+            split_classifier_params = {'random_state':0}, # dict of classifier params
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
             n_clusters = None, # number of clusters for KMeans
             random_state = 0,
@@ -158,6 +163,7 @@ class MDP_model:
                                           testing = False,
                                           max_k = max_k,
                                           classification=classification,
+                                          split_classifier_params = split_classifier_params,
                                           h=h,
                                           OutputFlag = 0,
                                           plot = plot)
@@ -182,6 +188,7 @@ class MDP_model:
                                           testing = False,
                                           max_k = self.opt_k,
                                           classification=classification,
+                                          split_classifier_params = split_classifier_params,
                                           h=h,
                                           OutputFlag = 0,
                                           plot = plot)
