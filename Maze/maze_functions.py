@@ -133,7 +133,10 @@ def opt_model_trajectory(m, maze):
         #print(a)
         
         obs, reward, done, info = env.step(a)
-        offset = np.array((random.random(), random.random()))
+        
+        #LINE CHANGED--------------
+#        offset = np.array((random.random(), random.random())
+        offset = np.array((random.random(), -random.random()))
         point = np.array((obs[0], -obs[1])) + offset
         #print(done)
         xs.append(obs[0])
