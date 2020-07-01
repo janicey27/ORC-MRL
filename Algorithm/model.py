@@ -15,8 +15,10 @@ import numpy as np
 
 from clustering import fit_CV, initializeClusters, splitter
 from testing import predict_cluster, training_value_error, get_MDP, \
-        predict_value_of_cluster, testing_value_error
+        predict_value_of_cluster, testing_value_error, model_trajectory, \
+        next_clusters
 from MDPtools import SolveMDP
+from sklearn.metrics import accuracy_score
 #################################################################
 
 class MDP_model:
@@ -29,8 +31,10 @@ class MDP_model:
         self.opt_k = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features
+        self.clus_pred_accuracy = None # accuracy score of the cluster prediction function
         self.P_df = None # Transition function of the learnt MDP
         self.R_df = None # Reward function of the learnt MDP
+        self.nc = None # dataframe similar to P_df, but also includes 'count' and 'purity' cols
         self.v = None # value after MDP solved
         self.pi = None # policy after MDP solved
         self.P = None # P_df but in matrix form of P[a, s, s']
@@ -107,17 +111,23 @@ class MDP_model:
                                           plot = plot)
         
         
-        # storing trained dataset and predict_cluster function
+        # storing trained dataset and predict_cluster function and accuracy
         self.df_trained = df_new
-        self.m = predict_cluster(self.df_trained, self.pfeatures)
+        self.m = predict_cluster(df_new, self.pfeatures)
+        pred = self.m.predict(df_new.iloc[:, 2:2+self.pfeatures])
+        self.clus_pred_accuracy = accuracy_score(pred, df_new['CLUSTER'])
         
         # store final training error
         self.training_error = training_value_error(self.df_trained)
+        
         
         # store P_df and R_df values
         P_df,R_df = get_MDP(self.df_trained)
         self.P_df = P_df
         self.R_df = R_df
+        
+        # store next_clusters dataframe
+        self.nc = next_clusters(df_new)
         
     
     # fit() takes in the parameters for prediction, and directly fits the model
@@ -195,12 +205,17 @@ class MDP_model:
         
         # storing trained dataset and predict_cluster function
         self.df_trained = df_new
-        self.m = predict_cluster(self.df_trained, self.pfeatures)
+        self.m = predict_cluster(df_new, self.pfeatures)
+        pred = self.m.predict(df_new.iloc[:, 2:2+self.pfeatures])
+        self.clus_pred_accuracy = accuracy_score(pred, df_new['CLUSTER'])
         
         # store P_df and R_df values
         P_df,R_df = get_MDP(self.df_trained)
         self.P_df = P_df
         self.R_df = R_df
+        
+        # store next_clusters dataframe
+        self.nc = next_clusters(df_new)
     
     # predict() takes a list of features and a time horizon, and returns 
     # the predicted value after all actions are taken in order
@@ -237,7 +252,6 @@ class MDP_model:
     
     # testing_error() takes a df_test, then computes and returns the testing 
     # error on this trained model 
-    # YET TO TEST!!!!
     def testing_error(self, 
                       df_test,
                       relative=False,
@@ -245,7 +259,7 @@ class MDP_model:
         
         error = testing_value_error(df_test, 
                             self.df_trained, 
-                            self, 
+                            self.m, 
                             self.pfeatures,
                             relative=relative,
                             h=h)
@@ -254,47 +268,62 @@ class MDP_model:
     
     
     # solve_MDP() takes the trained model as well as parameters for gamma, 
-    # epsilon, and whether the problem is a minimization or maximization one, 
-    # and returns the the value and policy
+    # epsilon, whether the problem is a minimization or maximization one, 
+    # and the threshold cutoffs to not include actions that don't appear enough
+    # in each state, as well as purity cutoff for next_states that do not 
+    # represent enough percentage of all the potential next_states 
+    # and returns the the value and policy. 
     def solve_MDP(self,
+                  action_th = 7, # int: least number of actions that must be seen
+                  purity_th = 0.3, # float: percentage purity above which is acceptable
                   prob='max', 
                   gamma=0.9, 
-                  epsilon=10**(-10), 
+                  epsilon=10**(-10),
                   p=True):
         
-        P_df = self.P_df.reset_index()
-        #print(P_df)
-        #P_df = P_df.loc[P_df['NEXT_CLUSTER']!='None']
+        # adding two clusters: one for reward sink, one for incorrectness sink
+        # reward sink is R[s-2], incorrectness sink is R[s-1]
+        
+        P_df = self.P_df.copy()
+        P_df['count'] = self.nc['count']
+        P_df['purity'] = self.nc['purity']
+        P_df = P_df.reset_index()
+        
+        # record parameters of transition dataframe
         a = P_df['ACTION'].nunique()
         s = P_df['CLUSTER'].nunique()
+        n = P_df['NEXT_CLUSTER'].nunique()
         
-        # if 'None'/end-state exists, create additional cluster
-        if 'None' in P_df['ACTION'].unique():
-            end_state = True
-            a -= 1
-            s += 1
-        else:
-            end_state = False
+        # Take out rows where actions or purity below threshold
+        P_opt = P_df.loc[(P_df['count']>action_th)&(P_df['purity']>purity_th)]
         
-        P = np.zeros((a, s, s))
-        for index, row in P_df.iterrows():
+        
+        # FIX to make sure there are no indexing errors - not big enough matrix defined?
+        P = np.zeros((a, s+1, s+1))
+        
+        
+        # model tranistions
+        for index, row in P_opt.iterrows():
             x, y, z = row['ACTION'], row['CLUSTER'], row['NEXT_CLUSTER']
-            if x == 'None':
-                for i in range(a):
-                    P[i, y, s-1] = 1
-            else:
-                P[x, y, z] = 1
+            P[x, y, z] = 1 
                 
-        if end_state:
-            for i in range(a):
-                P[i, s-1, s-1] = 1
+        # reinsert transition for cluster/action pairs taken out by threshold
+        # ALSO INCLUDE NOT SEEN??
+        excl = P_df.loc[(P_df['count']<=action_th)|(P_df['purity']<purity_th)]
+        for index, row in excl.iterrows():
+            c, u = row['CLUSTER'], row['ACTION']
+            P[u, c, s-1] = 1
         
+        # replacing correct sink node transitions
+        nan = P_df.loc[P_df['count'].isnull()]
+        for index, row in nan.iterrows():
+            c, u, t = row['CLUSTER'], row['ACTION'], row['NEXT_CLUSTER']
+            P[u, c, t] = 1
+        
+        # append high negative reward for incorrect / impure transitions
         R = []
         for i in range(a):
-            if end_state:
-                R.append(np.append(np.array(self.R_df),0))
-            else:
-                R.append(np.array(self.R_df))
+            R.append(np.append(np.array(self.R_df),-100))
         R = np.array(R)
         
         v, pi = SolveMDP(P, R, gamma, epsilon, p, prob)
@@ -306,3 +335,17 @@ class MDP_model:
         self.R = R
         
         return v, pi
+    
+    # opt_model_trajectory() takes a start state, a transition function, 
+    # indices of features to be considered, a transition function, and an int
+    # for number of points to be plotted. Plots and returns the transitions
+    def opt_model_trajectory(self,
+                             x, # start state as tuple or array
+                             f, # transition function of the form f(x, u) = x'
+                             f1=0, # index of feature 1 to be plotted
+                             f2=1, # index of feature 2 to be plotted
+                             n=30): # points to be plotted
+    
+        xs, ys = model_trajectory(self, f, x, f1, f2, n)
+        return xs, ys
+    

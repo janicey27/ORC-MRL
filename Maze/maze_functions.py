@@ -110,9 +110,10 @@ def createSamples(N, T_max, maze, r, reseed=False):
 
 # opt_model_trajectory() takes a trained model, the maze used to train this model, and 
 # plots the path of the optimal solution through the maze. returns the path
-def opt_model_trajectory(m, maze):
-    if m.v is None:
-        m.solve_MDP()
+def opt_model_trajectory(m, maze, action_th=7, purity_th=0.3):
+    #if m.v is None:
+        #m.solve_MDP()
+    m.solve_MDP(action_th, purity_th)
     env = gym.make(maze)
     obs = env.reset()
     l = env.maze_size[0]
@@ -121,8 +122,8 @@ def opt_model_trajectory(m, maze):
     xs = [obs[0]]
     ys = [-obs[1]]
     done = False
-    #offset = np.array([0.5, -0.5])
-    offset = np.array((random.random(), random.random()))
+
+    offset = np.array((random.random(), -random.random()))
     point = np.array((obs[0], -obs[1])) + offset
 
     while not done:
@@ -134,8 +135,6 @@ def opt_model_trajectory(m, maze):
         
         obs, reward, done, info = env.step(a)
         
-        #LINE CHANGED--------------
-#        offset = np.array((random.random(), random.random())
         offset = np.array((random.random(), -random.random()))
         point = np.array((obs[0], -obs[1])) + offset
         #print(done)
@@ -156,8 +155,8 @@ def opt_model_trajectory(m, maze):
     ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
     #ax.set_xlabel('FEATURE_%i' %f1)
     #ax.set_ylabel('FEATURE_%i' %f2)
-    plt.ylim(-l+0.5, 0.5)
-    plt.xlim(-.5, l-0.5)
+    plt.ylim(-l+0.8, 0.2)
+    plt.xlim(-.2, l-0.8)
     plt.show()
     return xs, ys
 
@@ -253,10 +252,10 @@ def get_maze_MDP(maze):
     
     # initialize matrices
     a = 4
-    #P = np.zeros((a, l*l+1, l*l+1))
-    #R = np.zeros((a, l*l+1))
-    P = np.zeros((a, l*l, l*l))
-    R = np.zeros((a, l*l))
+    P = np.zeros((a, l*l+1, l*l+1))
+    R = np.zeros((a, l*l+1))
+    #P = np.zeros((a, l*l, l*l))
+    #R = np.zeros((a, l*l))
     
     # store clusters seen and cluster/action pairs seen in set
     c_seen = set()
@@ -267,7 +266,7 @@ def get_maze_MDP(maze):
     ogc = int(obs[0] + obs[1]*l)
     reward = -0.1/(l*l)
     
-    while len(ca_seen) < 4*l*l:
+    while len(ca_seen) < (4*l*l-4):
         # update rewards for new cluster
         if ogc not in c_seen:
             for i in range(a):
@@ -297,10 +296,11 @@ def get_maze_MDP(maze):
                     #print('reset here')
                     # set next state to sink
                     #P[i, ogc_new] = np.zeros(l*l+1)
-                    #for i in range(a):
-                        #P[i, ogc_new, l*l] = 1
-                        #P[i, l*l, l*l] = 1
-                        #R[i, l*l] = 0
+                    for i in range(a):
+                        P[i, ogc_new, l*l] = 1
+                        P[i, l*l, l*l] = 1
+                        R[i, l*l] = 0
+                        R[i, ogc_new] = 1
                     obs = env.reset()
                     ogc = int(obs[0] + obs[1]*l)
                 
@@ -314,10 +314,35 @@ def get_maze_MDP(maze):
             new_obs, reward, done, info = env.step(action)
             ogc = int(new_obs[0] + new_obs[1]*l)
             #print('trying random action', ogc)
-            #if done:
-                
+            if done:
+                obs = env.reset()
+                ogc = int(obs[0] + obs[1]*l)
 
     return P, R
+
+
+# get_maze_transition() takes a maze name, and returns the transition function
+# in the form of f(x, u) = x'. State, action, gives next state. 
+def get_maze_transition(maze):
+    P, R = get_maze_MDP(maze)
+    l = int((R.size/4-1)**0.5)
+    
+    def f(x, u):
+        # first define the cluster of the maze based on position
+        x_orig = (int(x[0]), int(-x[1]))
+        c = int(x_orig[0] + x_orig[1]*l)
+        c_new = P[u, c].argmax()
+        offset = np.array((random.random(), -random.random()))
+        if c_new == R.size/4-1:
+            x_new = (x_orig[0], -x_orig[1])
+            return x_new + offset
+        else:
+            x_new = (c_new%l, c_new//l)
+            x_new = (x_new[0], -x_new[1])
+            return x_new + offset
+    
+    return f
+    
 
 
 # plot_paths() takes a dataframe with 'FEATURE_1' and 'FEATURE_2', and plots
@@ -327,7 +352,7 @@ def plot_paths(df, n):
     
     for i in range(n):
         x = df.loc[df['ID']==i]['FEATURE_0']
-        y = -df.loc[df['ID']==i]['FEATURE_1']
+        y = df.loc[df['ID']==i]['FEATURE_1']
         xs = np.array(x)
         ys = np.array(y)
         

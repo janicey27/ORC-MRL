@@ -61,7 +61,8 @@ def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
 
 
 # get_MDP() takes in a clustered dataframe df_new, and returns dataframes  
-# P_df and R_df that represent the parameters of the estimated MDP
+# P_df and R_df that represent the parameters of the estimated MDP (if sink
+# exists, it will be the highest value cluster and goes to itself)
 def get_MDP(df_new):
     # removing None values when counting where clusters go
     df0 = df_new[df_new['NEXT_CLUSTER']!='None']
@@ -73,6 +74,31 @@ def get_MDP(df_new):
     P_df = pd.DataFrame()
     P_df['NEXT_CLUSTER'] = transition_df.apply(lambda x: x[2])
     R_df = df_new.groupby('CLUSTER')['RISK'].mean()
+    
+    # check if end state exists, if so make a sink node
+    if 'End' in P_df['NEXT_CLUSTER'].unique():
+        P_df = P_df.reset_index()
+        
+        # find goal cluster that leads to sink, then remove
+        c = P_df.loc[P_df['NEXT_CLUSTER']=='End']['CLUSTER'].max()
+        P_df = P_df.loc[P_df['NEXT_CLUSTER']!='End']
+        
+        # create dataframe that goal go to sink and sink go to sink
+        s = P_df['CLUSTER'].max() + 1
+        actions = P_df['ACTION'].unique()
+        df_end = []
+        for a in actions:
+            df_end.append([c, a, s])
+            df_end.append([s, a, s])
+        df_end = pd.DataFrame(df_end, columns = ['CLUSTER', 'ACTION', 'NEXT_CLUSTER'])
+        
+        P_df = P_df.append(df_end)
+        P_df.sort_values(by=['CLUSTER','ACTION'], inplace=True)
+        P_df.set_index(['CLUSTER','ACTION'], inplace=True)
+        
+        # set new reward node 
+        R_df = R_df.append(pd.Series([0], index=[s]))
+        
     return P_df,R_df
 #################################################################
 
@@ -194,18 +220,20 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
         while cont:
             v_true = v_true + df_test['RISK'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
-            try:
-                s = P_df.loc[s,a].values[0]
-            # error raises in case we never saw a given transition in the data
-            except TypeError:
-                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
-            
             try: 
                 df_test['ID'].loc[index+t+1]
             except:
                 break
             if df_test['ID'].loc[index+t] != df_test['ID'].loc[index+t+1]:
                 break 
+            
+            try:
+                s = P_df.loc[s,a].values[0]
+            # error raises in case we never saw a given transition in the data
+            except TypeError:
+                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+            
+            
             t += 1
             a = df_test['ACTION'].loc[index + t]
         if relative:
@@ -378,11 +406,16 @@ def decision_tree(model):
     
 
 # NOT TESTED YET! TEST ON HIV WHEN MODEL TRAINED!
-# opt_model_trajectory() takes a trained model, the real transition function of
+# model_trajectory() takes a trained model, the real transition function of
 # the model f(x, u), the initial state x, and plots how the model's optimal 
 # policy looks like on the start state according to f1 and f2 two features 
 # indices e.g. x[f1] x[f2] plotted on the x and y axes, for n steps
-def opt_model_trajectory(m, f, x, f1, f2, n):
+def model_trajectory(m, 
+                    f, 
+                    x, 
+                    f1=0, 
+                    f2=1, 
+                    n=50):
     if m.v is None:
         m.solve_MDP()
     
