@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import graphviz
+import random
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
@@ -164,7 +165,8 @@ def training_value_error(df_new, #Outpul of algorithm
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
-            except TypeError:
+            #except ValueError
+            except:
                 print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
            
             t += 1
@@ -230,7 +232,9 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
-            except TypeError:
+            
+            #except TypeError: # sometimes we see KeyError or IndexError...
+            except:
                 print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             
             
@@ -284,7 +288,8 @@ def R2_value_training(df_new):
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
-            except TypeError:
+            #except TypeError:
+            except:
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_new['ACTION'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
@@ -332,7 +337,8 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
             try:
                 s = P_df.loc[s,a].values[0]
             # error raises in case we never saw a given transition in the data
-            except TypeError:
+            #except TypeError:
+            except:
                 print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_test['ACTION'].loc[index + t]
 
@@ -390,9 +396,9 @@ def next_clusters(df):
     return df_final
 
 
-# decision_tree() takes in a trained MDP model, outputs a pdf of 
+# decision_tree_diagram() takes in a trained MDP model, outputs a pdf of 
 # the best decision tree, as well as other visualizations
-def decision_tree(model):
+def decision_tree_diagram(model):
     # assumes that m.m, the prediction model, is a GridSearchCV object
     dc = model.m.best_estimator_
     
@@ -401,9 +407,48 @@ def decision_tree(model):
                                     filled=True, rounded=True,
                                     special_characters=True) 
     graph = graphviz.Source(dot_data) 
-    graph.render("Decision_Tree")
+    graph.render("Decision_Tree_Diagram")
+
     return graph
+
+
+# decision_tree_regions() takes a model and plots a visualization of the
+# decision regions of two of the features (currently first and second)
+def decision_tree_regions(model):
+    dc = model.m.best_estimator_
+    n_classes = model.df_trained['CLUSTER'].max()
+    plot_step = 0.02
     
+    plt.subplot()
+    x_min = model.df_trained.iloc[:, 2].min() - 1 
+    x_max = model.df_trained.iloc[:, 2].max() + 1 
+    y_min = model.df_trained.iloc[:, 3].min() - 1
+    y_max = model.df_trained.iloc[:, 3].max() + 1 
+    
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, plot_step),
+                         np.arange(y_min, y_max, plot_step))
+    
+    plt.tight_layout(h_pad=0.5, w_pad=0.5, pad=2.5)
+
+    Z = dc.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    cs = plt.contourf(xx, yy, Z, cmap=plt.cm.RdYlBu)
+    
+    for i in range(n_classes):
+        idx = np.where(model.df_trained['CLUSTER'] == i)
+        
+        r = random.random()
+        b = random.random()
+        g = random.random()
+        color = np.array([[r, g, b]])
+        #colors = ['r', 'y', 'b']
+        #color = colors[i%3]
+        plt.scatter(model.df_trained.iloc[idx].iloc[:, 2], \
+                    model.df_trained.iloc[idx].iloc[:, 3], c=color,
+                    cmap=plt.cm.RdYlBu, edgecolor='black', s=15)
+        
+    plt.show()
+    return
 
 # NOT TESTED YET! TEST ON HIV WHEN MODEL TRAINED!
 # model_trajectory() takes a trained model, the real transition function of

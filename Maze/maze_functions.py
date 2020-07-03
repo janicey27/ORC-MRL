@@ -29,6 +29,11 @@ for env in gym.envs.registry.env_specs.copy():
         del gym.envs.registry.env_specs[env]
 '''
 import gym_maze
+
+from sklearn.linear_model import LinearRegression, SGDRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+from tqdm import tqdm
 #################################################################
 
 # list of maze options to choose from:
@@ -110,10 +115,10 @@ def createSamples(N, T_max, maze, r, reseed=False):
 
 # opt_model_trajectory() takes a trained model, the maze used to train this model, and 
 # plots the path of the optimal solution through the maze. returns the path
-def opt_model_trajectory(m, maze, action_th=7, purity_th=0.3):
+def opt_model_trajectory(m, maze, min_action_obs=7, min_action_purity=0.3):
     #if m.v is None:
         #m.solve_MDP()
-    m.solve_MDP(action_th, purity_th)
+    m.solve_MDP(min_action_obs, min_action_purity)
     env = gym.make(maze)
     obs = env.reset()
     l = env.maze_size[0]
@@ -159,6 +164,64 @@ def opt_model_trajectory(m, maze, action_th=7, purity_th=0.3):
     plt.xlim(-.2, l-0.8)
     plt.show()
     return xs, ys
+
+
+# def policy_trajectory() takes a policy, a maze, and plots the optimal
+# trajectory of the policy through the maze, for a total of n steps. 
+# Can use with fitted_Q policy etc.
+def policy_trajectory(policy, maze, n=50):
+    env = gym.make(maze)
+    obs = env.reset()
+    l = env.maze_size[0]
+    reward = -0.1/(l*l)
+    
+    xs = [obs[0]]
+    ys = [-obs[1]]
+    
+    offset = np.array((random.random(), -random.random()))
+    point = list(np.array((obs[0], -obs[1])) + offset)
+
+    
+    done = False
+    i = 0
+    
+    while not done:
+        # find relevant action
+        #print(point)
+        a = policy.get_action(point)
+        #print(a)
+        obs, reward, done, info = env.step(a)
+        
+        xs.append(obs[0])
+        ys.append(-obs[1])
+        
+        offset = np.array((random.random(), -random.random()))
+        point = list(np.array((obs[0], -obs[1])) + offset)
+        
+        i += 1
+        if i == n:
+            done = True
+    
+    xs = np.array(xs)
+    ys = np.array(ys)
+    
+    u = np.diff(xs)
+    v = np.diff(ys)
+    pos_x = xs[:-1] + u/2
+    pos_y = ys[:-1] + v/2
+    norm = np.sqrt(u**2+v**2) 
+    
+    fig, ax = plt.subplots()
+    ax.plot(xs,ys, marker="o")
+    ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
+    #ax.set_xlabel('FEATURE_%i' %f1)
+    #ax.set_ylabel('FEATURE_%i' %f2)
+    plt.ylim(-l+0.8, 0.2)
+    plt.xlim(-.2, l-0.8)
+    plt.show()
+    return xs, ys
+        
+    
 
 
 # policy_accuracy() takes a trained model and a maze, compares every line of 
@@ -243,7 +306,7 @@ def opp_action(a):
         return 2
     
 # get_maze_MDP() takes a maze string name, and returns two matrices, P and R, 
-# which describe the MDP of the maze
+# which describe the MDP of the maze (includes a sink node)
 def get_maze_MDP(maze):
     # initialize maze
     env = gym.make(maze)
@@ -293,9 +356,7 @@ def get_maze_MDP(maze):
                 #print('new ogc', ogc, done)
                 
                 if done:
-                    #print('reset here')
                     # set next state to sink
-                    #P[i, ogc_new] = np.zeros(l*l+1)
                     for i in range(a):
                         P[i, ogc_new, l*l] = 1
                         P[i, l*l, l*l] = 1
@@ -321,27 +382,47 @@ def get_maze_MDP(maze):
     return P, R
 
 
-# get_maze_transition() takes a maze name, and returns the transition function
-# in the form of f(x, u) = x'. State, action, gives next state. 
-def get_maze_transition(maze):
+# get_maze_transition_reward() takes a maze name, and returns the transition function
+# in the form of f(x, u) = x'. State, action, gives next state. Takes into account
+# sink node, and stays there. Also returns reward function r(x) that takes a state
+# and returns the reward
+def get_maze_transition_reward(maze):
     P, R = get_maze_MDP(maze)
     l = int((R.size/4-1)**0.5)
     
     def f(x, u):
+        #print('x', x, 'u', u)
+        
         # first define the cluster of the maze based on position
         x_orig = (int(x[0]), int(-x[1]))
+        offset = np.array((random.random(), -random.random()))
+        
+        # if no action, or an action '4' to simulate no action: 
+        if u == 'None' or u == 4:
+            x_new = (0, -5)
+            return x_new
+        
         c = int(x_orig[0] + x_orig[1]*l)
         c_new = P[u, c].argmax()
-        offset = np.array((random.random(), -random.random()))
+        
+        
+        # if maze at sink, stay at sink (lower left corner)
         if c_new == R.size/4-1:
-            x_new = (x_orig[0], -x_orig[1])
-            return x_new + offset
+            x_new = (0, -5)
+            return x_new
         else:
             x_new = (c_new%l, c_new//l)
             x_new = (x_new[0], -x_new[1])
             return x_new + offset
+        
+        
+    def r(x):
+        x_orig = (int(x[0]), int(-x[1]))
+        c = int(x_orig[0] + x_orig[1]*l)
+        #print(c)
+        return R[0][c]
     
-    return f
+    return f, r
     
 
 
@@ -367,6 +448,149 @@ def plot_paths(df, n):
     
     plt.show()
     return
+
+
+
+# fitted_Q() trains K functions Q1 to QK that determine the optimal strategy
+# x_df is a dataframe of the form ['ID', 'TIME', features, 'ACTION', 'RISK']
+# for each one-step transition returns the last iteration QK, and a function \
+# policy that takes a state and outputs the optimal action
+def fitted_Q(K, # number of iterations
+             x_df, # dataframe 
+             gamma, # decay factor
+             pfeatures, # number of features in dataframe
+             actions, # list of action possibilities
+             f, # transition function 
+             reward_c, # reward function
+             take_max = True, # True if max_cost is good, otherwise false
+             regression = 'LinearRegression' # str: type of regression
+             ):
+    
+    x_df = x_df.copy(deep=True)
+    #x_df = x_df.loc[x_df['']]
+    # initialize storage and actions
+    #Qs = []
+    
+    # create the first Q1 function
+    class Q:
+        def predict(self, array): 
+            x = array[0][:pfeatures]
+            #print('x', x)
+            return reward_c(x)
+    Q_new = Q()
+    #Qs.append(Q_new)
+    
+    # calculate the x_t2 next step for each x
+    x_df['x_t2'] = x_df.apply(lambda x: list(f(tuple(x[2:2+pfeatures]), x.ACTION)), \
+                                          axis=1)
+        
+        
+    for i in range(len(actions)):
+        x_df['a%s'%i] = x_df.apply(lambda x: x.x_t2+[actions[i]], axis=1)
+    action_names = ['a%s'%i for i in range(len(actions))]
+    
+    print(x_df, flush=True)
+    # create X using x_t and u
+    # select (x_t, u) pair as training
+    # setting 'None' action as action 4
+    X = x_df.iloc[:, 2:3+pfeatures]
+    X.loc[X['ACTION']=='None', X['ACTION']] = 4
+    
+    
+    # maybe trying to put action as a tuple of (0, 1) to help it learn better...?
+    #X = x_df[['FEATURE_0', 'FEATURE_1']].merge(x_df['ACTION'].apply(pd.Series), \
+                #left_index = True, right_index = True) 
+    
+    print('New training features', flush=True)
+    print(X, flush=True)
+    
+    
+    bar = tqdm(range(K))
+    #bar = range(K)
+    #creating new Qk functions
+    for i in bar:
+        # create y using Qk-1 and x_t2
+        # non-DP
+        if take_max: 
+            y = x_df.apply(lambda x: x.RISK + gamma*max([Q_new.predict([g]) \
+                                for g in [x[a] for a in action_names]]), axis=1)
+        else:
+            y = x_df.apply(lambda x: x.RISK + gamma*min([Q_new.predict([g]) \
+                                for g in [x[a] for a in action_names]]), axis=1)
+        
+        
+        
+        '''                               
+        # initialize dp
+        memo = {}
+        mu = 0
+        y = []                        
+        for index, row in x_df.iterrows():
+            qs = []
+            for f in [row['a0'], row['a1'], row['a2'], row['a3']]:
+                if f in memo:
+                    qs.append(memo[f])
+                    #print('memo used')
+                    mu += 1
+                else:
+                    q = Q_new.predict([f])
+                    memo[f] = q
+                    qs.append(memo[f])
+            y.append(row['c'] + gamma*min(qs))
+        '''
+        
+        y = np.array(y)
+        print(y, flush=True)
+        print(np.unique(y), flush=True)
+        #print(y)
+        
+        # train the actual Regression function as Qk
+        #regr = MLPRegressor(random_state=1, max_iter=500).fit(X, y)
+        if regression ==  'LinearRegression':
+            regr = LinearRegression().fit(X, y)
+        if regression == 'RandomForest':
+            regr = RandomForestRegressor(max_depth=2, random_state=0).fit(X, y)
+        if regression == 'ExtraTrees':
+            regr = ExtraTreesRegressor(n_estimators=50).fit(X,y.ravel())
+        if regression == 'SGDRegressor':
+            regr = SGDRegressor().fit(X, y.ravel())
+        #Qs.append(regr)
+        Q_new = regr
+        #print('memo size', len(memo), 'used', mu, flush=True)
+        
+    
+    #QK = Qs[-1]
+    QK = Q_new
+    
+    p = policy(actions, take_max)
+    p.fit(QK)
+        
+    return QK, p, x_df
+
+
+class policy:
+    def __init__(self, actions, take_max):
+        self.QK = None
+        self.actions = actions
+        self.take_max = take_max
+        
+    def fit(self, 
+            QK): # model, the latest fitted_Q 
+        self.QK = QK
+    
+    # pred() takes a state x and predicts the optimal action
+    def get_action(self,
+             x): 
+        if self.take_max:
+            i = np.argmax([self.QK.predict([x + [u]]) \
+                                        for u in self.actions])
+        else:
+            i = np.argmin([self.QK.predict([x + [u]]) \
+                                            for u in self.actions])
+        return self.actions[i]
+    
+    
+
         
 # Initialize the "maze" environment
 # =============================================================================

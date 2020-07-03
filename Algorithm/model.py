@@ -98,6 +98,9 @@ class MDP_model:
                                 distance_threshold = distance_threshold,
                                 random_state=random_state)
         
+        # change end state to 'end'
+        df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
+        
         df_new,training_error,testing_error = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
@@ -274,8 +277,8 @@ class MDP_model:
     # represent enough percentage of all the potential next_states 
     # and returns the the value and policy. 
     def solve_MDP(self,
-                  action_th = 7, # int: least number of actions that must be seen
-                  purity_th = 0.3, # float: percentage purity above which is acceptable
+                  min_action_obs = 7, # int: least number of actions that must be seen
+                  min_action_purity = 0.3, # float: percentage purity above which is acceptable
                   prob='max', 
                   gamma=0.9, 
                   epsilon=10**(-10),
@@ -295,7 +298,7 @@ class MDP_model:
         n = P_df['NEXT_CLUSTER'].nunique()
         
         # Take out rows where actions or purity below threshold
-        P_opt = P_df.loc[(P_df['count']>action_th)&(P_df['purity']>purity_th)]
+        P_opt = P_df.loc[(P_df['count']>min_action_obs)&(P_df['purity']>min_action_purity)]
         
         
         # FIX to make sure there are no indexing errors - not big enough matrix defined?
@@ -309,7 +312,7 @@ class MDP_model:
                 
         # reinsert transition for cluster/action pairs taken out by threshold
         # ALSO INCLUDE NOT SEEN??
-        excl = P_df.loc[(P_df['count']<=action_th)|(P_df['purity']<purity_th)]
+        excl = P_df.loc[(P_df['count']<=min_action_obs)|(P_df['purity']<min_action_purity)]
         for index, row in excl.iterrows():
             c, u = row['CLUSTER'], row['ACTION']
             P[u, c, s-1] = 1
