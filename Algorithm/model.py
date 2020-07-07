@@ -32,12 +32,14 @@ class MDP_model:
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features
         self.clus_pred_accuracy = None # accuracy score of the cluster prediction function
-        self.P_df = None # Transition function of the learnt MDP
-        self.R_df = None # Reward function of the learnt MDP
+        self.P_df = None # Transition function of the learnt MDP, includes sink node if end state exists
+        self.R_df = None # Reward function of the learnt MDP, includes sink node of reward 0 if end state exists
         self.nc = None # dataframe similar to P_df, but also includes 'count' and 'purity' cols
         self.v = None # value after MDP solved
         self.pi = None # policy after MDP solved
-        self.P = None # P_df but in matrix form of P[a, s, s']
+        self.P = None # P_df but in matrix form of P[a, s, s'], with alterations
+                        # where transitions that do not pass the action and purity thresholds
+                        # now lead to a new cluster with high negative reward
         self.R = None # R_df but in matrix form of R[a, s]
         
         
@@ -298,7 +300,11 @@ class MDP_model:
         n = P_df['NEXT_CLUSTER'].nunique()
         
         # Take out rows where actions or purity below threshold
-        P_opt = P_df.loc[(P_df['count']>min_action_obs)&(P_df['purity']>min_action_purity)]
+        P_thresh = P_df.loc[(P_df['count']>min_action_obs)&(P_df['purity']>min_action_purity)]
+        
+        # Take out rows where we have missing actions:
+        incomplete_clusters = np.where(P_df.groupby('CLUSTER')['ACTION'].count()<a)[0]
+        P_opt = P_thresh.loc[~P_thresh['CLUSTER'].isin(incomplete_clusters)]
         
         
         # FIX to make sure there are no indexing errors - not big enough matrix defined?
@@ -312,10 +318,16 @@ class MDP_model:
                 
         # reinsert transition for cluster/action pairs taken out by threshold
         # ALSO INCLUDE NOT SEEN??
-        excl = P_df.loc[(P_df['count']<=min_action_obs)|(P_df['purity']<min_action_purity)]
+        excl = P_df.loc[(P_df['count']<=min_action_obs)|(P_df['purity']<=min_action_purity)]
         for index, row in excl.iterrows():
             c, u = row['CLUSTER'], row['ACTION']
-            P[u, c, s-1] = 1
+            P[u, c, -1] = 1
+            
+        # reinsert transition for clusters taken out by missing actions:
+        for c in incomplete_clusters:
+            for u in range(a):
+                P[u, c, -1] = 1
+                
         
         # replacing correct sink node transitions
         nan = P_df.loc[P_df['count'].isnull()]
@@ -323,10 +335,18 @@ class MDP_model:
             c, u, t = row['CLUSTER'], row['ACTION'], row['NEXT_CLUSTER']
             P[u, c, t] = 1
         
+        # punishment node to itself:
+        for u in range(a):
+            P[u, -1, -1] = 1
+        
         # append high negative reward for incorrect / impure transitions
         R = []
         for i in range(a):
-            R.append(np.append(np.array(self.R_df),-100))
+            if prob == 'max':
+                # instead of -100, take T-max * max reward * 10 ## store T_max and r_max from fit
+                R.append(np.append(np.array(self.R_df),-100))
+            else:
+                R.append(np.append(np.array(self.R_df),100))
         R = np.array(R)
         
         v, pi = SolveMDP(P, R, gamma, epsilon, p, prob)

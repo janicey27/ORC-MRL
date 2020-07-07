@@ -497,7 +497,7 @@ def fitted_Q(K, # number of iterations
     X.loc[X['ACTION']=='None', X['ACTION']] = 4
     
     
-    # maybe trying to put action as a tuple of (0, 1) to help it learn better...?
+    # maybe trying to put action as a tuple of (0, 1) or 1-hot to help it learn better...?
     #X = x_df[['FEATURE_0', 'FEATURE_1']].merge(x_df['ACTION'].apply(pd.Series), \
                 #left_index = True, right_index = True) 
     

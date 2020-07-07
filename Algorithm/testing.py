@@ -63,7 +63,7 @@ def predict_value_of_cluster(P_df,R_df, # df: MDP parameters
 
 # get_MDP() takes in a clustered dataframe df_new, and returns dataframes  
 # P_df and R_df that represent the parameters of the estimated MDP (if sink
-# exists, it will be the highest value cluster and goes to itself)
+# exists, it will be the last cluster and goes to itself)
 def get_MDP(df_new):
     # removing None values when counting where clusters go
     df0 = df_new[df_new['NEXT_CLUSTER']!='None']
@@ -99,6 +99,8 @@ def get_MDP(df_new):
         
         # set new reward node 
         R_df = R_df.append(pd.Series([0], index=[s]))
+        
+        # print "end state defined as cluster __" 
         
     return P_df,R_df
 #################################################################

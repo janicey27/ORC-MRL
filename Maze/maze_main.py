@@ -23,8 +23,8 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 50
-T_max = 30
+N = 100
+T_max = 25
 max_k = 25
 clustering = 'Agglomerative'
 n_clusters = None
@@ -57,7 +57,7 @@ mazes = {1: 'maze-v0',
          11: 'maze-random-20x20-plus-v0', # has portals 
          12: 'maze-random-30x30-plus-v0'} # has portals 
 
-df = createSamples(N, T_max, mazes[4], 0.5, reseed=True)
+df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
 print(df)
 
 #################################################################

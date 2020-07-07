@@ -133,6 +133,8 @@ def fitted_Q(K, # number of iterations
     for i in range(len(actions)):
         x_df['a%s'%i] = x_df.apply(lambda x: x.x_t2+[actions[i]], axis=1)
     action_names = ['a%s'%i for i in range(len(actions))]
+    
+    print(x_df, flush=True)
     # create X using x_t and u
     # select (x_t, u) pair as training
     X = x_df.iloc[:, 2:3+pfeatures]
@@ -153,7 +155,7 @@ def fitted_Q(K, # number of iterations
             y = x_df.apply(lambda x: x.RISK + gamma*min([Q_new.predict([f]) \
                                 for f in [x[a] for a in action_names]]), axis=1)
         
-        
+        print(y, flush=True)
         '''                               
         # initialize dp
         memo = {}
@@ -178,11 +180,11 @@ def fitted_Q(K, # number of iterations
         
         # train the actual Regression function as Qk
         #regr = MLPRegressor(random_state=1, max_iter=500).fit(X, y)
-        if regression ==  'Linear Regression':
+        if regression ==  'LinearRegression':
             regr = LinearRegression().fit(X, y)
-        if regression == 'Random Forest':
+        if regression == 'RandomForest':
             regr = RandomForestRegressor(max_depth=2, random_state=0).fit(X, y)
-        if regression == 'Extra Trees':
+        if regression == 'ExtraTrees':
             regr = ExtraTreesRegressor(n_estimators=50).fit(X,y.ravel())
         #Qs.append(regr)
         Q_new = regr
