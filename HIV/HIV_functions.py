@@ -23,7 +23,11 @@ from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 # the new features x_t (T1, T2... V, E)
 def f(x, u, t, dt = 0.0005):
     T1, T2, Ts1, Ts2, V, E = x
-    u1, u2 = u
+    try:
+        u1, u2 = u
+    except: 
+        u = convert(u)
+        u1, u2 = u
     # defining action parameters
     # for RTI
     if u1 == 1:
@@ -84,8 +88,13 @@ def f(x, u, t, dt = 0.0005):
 # c_a() takes in a tuple of features x, and a tuple of actions u = (u1, u2),
 # and returns the action-dependent cost of the current state-action pair
 def c_a(x, u):
+    
     T1, T2, Ts1, Ts2, V, E = x
-    u1, u2 = u
+    try:
+        u1, u2 = u
+    except: 
+        u = convert(u)
+        u1, u2 = u
     
     # defining parameters
     Q = 0.1
@@ -304,7 +313,7 @@ def createSamples(N,
                   T,
                   r,
                   cost, # 'c_a', 'c_r', or 'dist' 
-                  thresh, # if cost == 'dist', thresh is threshold around healthy & unhealthy points
+                  eps, # if cost == 'dist', thresh is threshold around healthy & unhealthy points
                   p=None): 
     
     # starting in non-healthy steady state
@@ -327,9 +336,9 @@ def createSamples(N,
             xt = f(x, u, 5) # simulating 5 day change
             
             if cost == 'dist': 
-                if distance.euclidean(x, unhealthy) < thresh:
+                if distance.euclidean(x, unhealthy) < eps:
                     c = -1
-                elif distance.euclidean(x, healthy) < thresh:
+                elif distance.euclidean(x, healthy) < eps:
                     c = 1
                 else: 
                     c = 0
@@ -357,6 +366,10 @@ def createSamples(N,
 # corresponding other equivalent
 def convert(u):
     Us = [(0, 0), (0, 1), (1, 0), (1, 1)]
+    try: 
+        len(u)
+    except:
+        u = int(u)
     if type(u) == int: 
         return Us[u]
     else:
