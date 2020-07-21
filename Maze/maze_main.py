@@ -23,7 +23,7 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 100
+N = 110
 T_max = 25
 max_k = 25
 clustering = 'Agglomerative'
@@ -58,7 +58,7 @@ mazes = {1: 'maze-v0',
          12: 'maze-random-30x30-plus-v0'} # has portals 
 
 df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
-print(df)
+#print(df)
 
 #################################################################
 # Run Algorithm
@@ -78,4 +78,24 @@ m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', '
     random_state,
     plot=True,
     optimize=True)
+'''
+
+#################################################################
+# Loading csv
+'''
+filename = ''
+df = pd.read_csv(filename)
+
+# taking out extra ID col and changing actions back to integers
+df = df.iloc[:, 1:]
+df.loc[df['ACTION']=='None', 'ACTION'] = 4
+df['ACTION'] = pd.to_numeric(df['ACTION'], downcast='integer')
+df.loc[df['ACTION']==4, 'ACTION'] = 'None'
+'''
+
+# Running fitted_Q
+'''
+f, r = get_maze_transition_reward(mazes[4])
+Q, p, x_df = fitted_Q(100, df, 0.98, 2, [0, 1, 2, 3], f, r, True, 'ExtraTrees')
+pickle.dump(p, open('fitted_Q_policy_N=170.sav', 'wb'))
 '''

@@ -476,13 +476,17 @@ def model_trajectory(m,
         a = int(m.pi[s])
         #print(a)
         x_new = f(x, a)
+        if x_new[0] == None:
+            break
         
         xs.append(x_new[f1])
         ys.append(x_new[f2])
         x = x_new
-
+    
+    # TODO: not plot the sink
     xs = np.array(xs)
     ys = np.array(ys)
+    
     
     u = np.diff(xs)
     v = np.diff(ys)

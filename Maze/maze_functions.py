@@ -227,7 +227,7 @@ def policy_trajectory(policy, maze, n=50):
 # policy_accuracy() takes a trained model and a maze, compares every line of 
 # the original dataset to the real optimal policy and the model's optimal policy, 
 # then returns the percentage correct from the model
-def policy_accuracy(m, maze):
+def policy_accuracy(m, maze, df):
     if m.v is None:
         m.solve_MDP()
         
@@ -237,7 +237,7 @@ def policy_accuracy(m, maze):
     
     correct = 0
     # iterating through every line and comparing 
-    for index, row in m.df.iterrows():
+    for index, row in df.iterrows():
         # predicted action: 
         s = m.m.predict(np.array(row[2:2+m.pfeatures]).reshape(1,-1))
         #s = m.df_trained.iloc[index]['CLUSTER']
@@ -247,8 +247,33 @@ def policy_accuracy(m, maze):
         a_true = true_pi[row['OG_CLUSTER']]
         if a == a_true:
             correct += 1
-    total = m.df.shape[0]
+    total = df.shape[0]
     return correct/total
+
+# fitted_Q_policy_accuracy() takes a policy given by fitted_Q, the maze, 
+# and the original dataframe, compares every line of the original dataset to
+# the real optimal policy and the fitted_Q's optimal policy, then returns the
+# percentage correct from fitted_Q 
+def fitted_Q_policy_accuracy(policy, maze, df):
+        
+    # finding the true optimal: 
+    P, R = get_maze_MDP(maze)
+    true_v, true_pi = SolveMDP(P, R, 0.98, 1e-10, True, 'max')
+    
+    correct = 0
+    # iterating through every line and comparing 
+    for index, row in df.iterrows():
+        # predicted action: 
+        a = policy.get_action(list(row[2:4]))
+        
+        # real action:
+        a_true = true_pi[row['OG_CLUSTER']]
+        if a == a_true:
+            correct += 1
+    total = df.shape[0]
+    return correct/total
+
+
 
 # opt_maze_trajectory() takes a maze name, then solves the policy and plots the
 # optimal path through the maze. Returns the path. ONLY WORKS for deterministic
@@ -390,37 +415,51 @@ def get_maze_transition_reward(maze):
     P, R = get_maze_MDP(maze)
     l = int((R.size/4-1)**0.5)
     
-    def f(x, u):
+    def f(x, u, plot=True):
         #print('x', x, 'u', u)
+        
+        # if sink, return None again
+        if plot:
+            if x[0] == None:
+                return (None, None)
+        
+        # if no action, or an action '4' to simulate no action: 
+        if u == 'None' or u == 4:
+            if plot:
+                return (None, None)
+            else:
+                return (0, -l)
         
         # first define the cluster of the maze based on position
         x_orig = (int(x[0]), int(-x[1]))
         offset = np.array((random.random(), -random.random()))
-        
-        # if no action, or an action '4' to simulate no action: 
-        if u == 'None' or u == 4:
-            x_new = (0, -5)
-            return x_new
+    
         
         c = int(x_orig[0] + x_orig[1]*l)
         c_new = P[u, c].argmax()
         
         
-        # if maze at sink, stay at sink (lower left corner)
+        # if maze at sink, return None
         if c_new == R.size/4-1:
-            x_new = (0, -5)
-            return x_new
+            if plot:
+                return (None, None)
+            else:
+                return (0, -l)
         else:
             x_new = (c_new%l, c_new//l)
             x_new = (x_new[0], -x_new[1])
-            return x_new + offset
+        return x_new + offset
         
         
     def r(x):
-        x_orig = (int(x[0]), int(-x[1]))
-        c = int(x_orig[0] + x_orig[1]*l)
-        #print(c)
-        return R[0][c]
+        # if sink, return 0 reward
+        if x[0] == None:
+            return R[0][-1]
+        else:
+            x_orig = (int(x[0]), int(-x[1]))
+            c = int(x_orig[0] + x_orig[1]*l)
+            #print(c)
+            return R[0][c]
     
     return f, r
     
@@ -481,7 +520,7 @@ def fitted_Q(K, # number of iterations
     #Qs.append(Q_new)
     
     # calculate the x_t2 next step for each x
-    x_df['x_t2'] = x_df.apply(lambda x: list(f(tuple(x[2:2+pfeatures]), x.ACTION)), \
+    x_df['x_t2'] = x_df.apply(lambda x: list(f(tuple(x[2:2+pfeatures]), x.ACTION, False)), \
                                           axis=1)
         
         
@@ -494,7 +533,7 @@ def fitted_Q(K, # number of iterations
     # select (x_t, u) pair as training
     # setting 'None' action as action 4
     X = x_df.iloc[:, 2:3+pfeatures]
-    X.loc[X['ACTION']=='None', X['ACTION']] = 4
+    X.loc[X['ACTION']=='None', 'ACTION'] = 4
     
     
     # maybe trying to put action as a tuple of (0, 1) or 1-hot to help it learn better...?
@@ -540,8 +579,8 @@ def fitted_Q(K, # number of iterations
         '''
         
         y = np.array(y)
-        print(y, flush=True)
-        print(np.unique(y), flush=True)
+        #print(y, flush=True)
+        #print(np.unique(y), flush=True)
         #print(y)
         
         # train the actual Regression function as Qk
