@@ -23,7 +23,7 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 110
+N = 100
 T_max = 25
 max_k = 25
 clustering = 'Agglomerative'

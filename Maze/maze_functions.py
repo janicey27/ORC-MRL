@@ -115,10 +115,10 @@ def createSamples(N, T_max, maze, r, reseed=False):
 
 # opt_model_trajectory() takes a trained model, the maze used to train this model, and 
 # plots the path of the optimal solution through the maze. returns the path
-def opt_model_trajectory(m, maze, min_action_obs=7, min_action_purity=0.3):
+def opt_model_trajectory(m, maze, alpha, min_action_obs=0, min_action_purity=0):
     #if m.v is None:
         #m.solve_MDP()
-    m.solve_MDP(min_action_obs, min_action_purity)
+    m.solve_MDP(alpha, min_action_obs, min_action_purity)
     env = gym.make(maze)
     obs = env.reset()
     l = env.maze_size[0]

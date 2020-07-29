@@ -19,6 +19,7 @@ from testing import predict_cluster, training_value_error, get_MDP, \
         next_clusters
 from MDPtools import SolveMDP
 from sklearn.metrics import accuracy_score
+from scipy.stats import binom
 #################################################################
 
 class MDP_model:
@@ -279,7 +280,8 @@ class MDP_model:
     # represent enough percentage of all the potential next_states 
     # and returns the the value and policy. 
     def solve_MDP(self,
-                  min_action_obs = 7, # int: least number of actions that must be seen
+                  alpha = 0.2, # statistical alpha threshold
+                  min_action_obs = 5, # int: least number of actions that must be seen
                   min_action_purity = 0.3, # float: percentage purity above which is acceptable
                   prob='max', 
                   gamma=0.9, 
@@ -299,13 +301,22 @@ class MDP_model:
         s = P_df['CLUSTER'].nunique()
         n = P_df['NEXT_CLUSTER'].nunique()
         
+        #print(P_df)
+        # Take out rows that don't pass statistical alpha test
+        #P_alph = P_df.loc[(1-binom.cdf(P_df['purity']*(P_df['count']), P_df['count'],\
+                                      #0.5))<=alpha]
+        
+        P_alph = P_df.loc[(1-binom.cdf(P_df['count'], P_df['count']/P_df['purity'],\
+                                      0.5))<=alpha]
+        
         # Take out rows where actions or purity below threshold
-        P_thresh = P_df.loc[(P_df['count']>min_action_obs)&(P_df['purity']>min_action_purity)]
+        P_thresh = P_alph.loc[(P_alph['count']>min_action_obs)&(P_alph['purity']>min_action_purity)]
         
         # Take out rows where we have missing actions:
         incomplete_clusters = np.where(P_df.groupby('CLUSTER')['ACTION'].count()<a)[0]
         P_opt = P_thresh.loc[~P_thresh['CLUSTER'].isin(incomplete_clusters)]
         
+        #print(P_opt)
         
         # FIX to make sure there are no indexing errors - not big enough matrix defined?
         P = np.zeros((a, s+1, s+1))
@@ -316,6 +327,13 @@ class MDP_model:
             x, y, z = row['ACTION'], row['CLUSTER'], row['NEXT_CLUSTER']
             P[x, y, z] = 1 
                 
+        # reinsert transition for cluster/action pairs taken out by alpha test
+        excl_alph = P_df.loc[(1-binom.cdf(P_df['purity']*P_df['count'], P_df['count'],\
+                                      0.5))>alpha]
+        for index, row in excl_alph.iterrows():
+            c, u = row['CLUSTER'], row['ACTION']
+            P[u, c, -1] = 1
+            
         # reinsert transition for cluster/action pairs taken out by threshold
         # ALSO INCLUDE NOT SEEN??
         excl = P_df.loc[(P_df['count']<=min_action_obs)|(P_df['purity']<=min_action_purity)]
