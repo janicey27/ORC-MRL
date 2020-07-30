@@ -386,7 +386,8 @@ def cluster_size(df):
 
 
 # next_clusters() takes a dataframe, and returns a chart showing transitions from
-# each cluster/action pair, and the purity of the highest next_cluster. 
+# each cluster/action pair, count of each cluster/action pair, and the purity 
+# of the highest next_cluster. 
 # Disregards those with 'NEXT_CLUSTER' = None, and returns a dataframe of the results
 def next_clusters(df):
     df = df.loc[df['NEXT_CLUSTER']!='None']
@@ -395,6 +396,7 @@ def next_clusters(df):
     df2.reset_index(inplace=True)
     idx = df2.groupby(['CLUSTER', 'ACTION'])['count'].transform(max) == df2['count']
     df_final = df2[idx].groupby(['CLUSTER','ACTION']).max()
+    df_final['count'] = df2.groupby(['CLUSTER', 'ACTION'])['count'].sum()
     return df_final
 
 

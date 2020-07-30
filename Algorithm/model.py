@@ -303,11 +303,12 @@ class MDP_model:
         
         #print(P_df)
         # Take out rows that don't pass statistical alpha test
-        #P_alph = P_df.loc[(1-binom.cdf(P_df['purity']*(P_df['count']), P_df['count'],\
-                                      #0.5))<=alpha]
-        
-        P_alph = P_df.loc[(1-binom.cdf(P_df['count'], P_df['count']/P_df['purity'],\
+        P_alph = P_df.loc[(1-binom.cdf(P_df['purity']*(P_df['count']), P_df['count'],\
                                       0.5))<=alpha]
+        
+        # for old version of self.nc:
+        #P_alph = P_df.loc[(1-binom.cdf(P_df['count'], P_df['count']/P_df['purity'],\
+                                      #0.5))<=alpha]
         
         # Take out rows where actions or purity below threshold
         P_thresh = P_alph.loc[(P_alph['count']>min_action_obs)&(P_alph['purity']>min_action_purity)]
@@ -389,4 +390,10 @@ class MDP_model:
     
         xs, ys = model_trajectory(self, f, x, f1, f2, n)
         return xs, ys
+    
+    
+    # update_nc() allows self.nc to be updated for models that were saved 
+    # before the 'COUNT' issue in next_clusters was resolved
+    def update_nc(self):
+        self.nc = next_clusters(self.df_trained)
     
