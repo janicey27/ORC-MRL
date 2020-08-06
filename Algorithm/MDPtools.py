@@ -160,6 +160,7 @@ def Bell(V, P, R, gamma, prob='min', reduced=True):
                 res[i] = min(res[i], sum(P[a, i, :]*(R[a, i, :] + gamma*v)))
     if prob == 'max':
         for i in range(n):
+            res[i] = sum(P[0,i,:]*(R[0,i,:] + gamma*v))
             for a in range(m):
                 res[i] = max(res[i], sum(P[a, i, :]*(R[a, i, :] + gamma*v)))
     return res
