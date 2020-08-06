@@ -396,4 +396,5 @@ class MDP_model:
     # before the 'COUNT' issue in next_clusters was resolved
     def update_nc(self):
         self.nc = next_clusters(self.df_trained)
+        return
     

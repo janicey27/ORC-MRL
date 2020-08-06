@@ -169,18 +169,22 @@ def opt_model_trajectory(m, maze, alpha, min_action_obs=0, min_action_purity=0):
 # def policy_trajectory() takes a policy, a maze, and plots the optimal
 # trajectory of the policy through the maze, for a total of n steps. 
 # Can use with fitted_Q policy etc.
-def policy_trajectory(policy, maze, n=50):
+def policy_trajectory(policy, maze, n=50, rand=True):
     env = gym.make(maze)
     obs = env.reset()
     l = env.maze_size[0]
     reward = -0.1/(l*l)
     
-    xs = [obs[0]]
-    ys = [-obs[1]]
     
     offset = np.array((random.random(), -random.random()))
     point = list(np.array((obs[0], -obs[1])) + offset)
 
+    if rand:
+        xs = [point[0]]
+        ys = [point[1]]
+    else:
+        xs = [obs[0]]
+        ys = [-obs[1]]
     
     done = False
     i = 0
@@ -192,11 +196,15 @@ def policy_trajectory(policy, maze, n=50):
         #print(a)
         obs, reward, done, info = env.step(a)
         
-        xs.append(obs[0])
-        ys.append(-obs[1])
-        
         offset = np.array((random.random(), -random.random()))
         point = list(np.array((obs[0], -obs[1])) + offset)
+        
+        if rand:
+            xs.append(point[0])
+            ys.append(point[1])
+        else:
+            xs.append(obs[0])
+            ys.append(-obs[1])
         
         i += 1
         if i == n:
@@ -216,8 +224,12 @@ def policy_trajectory(policy, maze, n=50):
     ax.quiver(pos_x, pos_y, u/norm, v/norm, angles="xy", zorder=5, pivot="mid")
     #ax.set_xlabel('FEATURE_%i' %f1)
     #ax.set_ylabel('FEATURE_%i' %f2)
-    plt.ylim(-l+0.8, 0.2)
-    plt.xlim(-.2, l-0.8)
+    if rand:
+        plt.ylim(-l-0.2, 0.2)
+        plt.xlim(-.2, l+0.2)
+    else:
+        plt.ylim(-l+0.8, 0.2)
+        plt.xlim(-.2, l-0.8)
     plt.show()
     return xs, ys
         
@@ -412,6 +424,7 @@ def get_maze_MDP(maze):
 # sink node, and stays there. Also returns reward function r(x) that takes a state
 # and returns the reward
 def get_maze_transition_reward(maze):
+    
     P, R = get_maze_MDP(maze)
     l = int((R.size/4-1)**0.5)
     

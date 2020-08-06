@@ -556,7 +556,7 @@ def testing_accuracy(df_test, # dataframe: testing data
     
     clusters = get_predictions(df_new)
     
-    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
+    test_clusters = model.m.predict(df_test.iloc[:, 2:2+pfeatures])
     df_test['CLUSTER'] = test_clusters
     
     accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] \
@@ -576,5 +576,30 @@ def purity(df):
     .value_counts(normalize=True)).reset_index(level=0)
     su.columns= ['CLUSTER','Purity']
     return su.groupby('CLUSTER')['Purity'].max()
+
+
+# generalization_accuracy() plots the training and testing accuracies as above
+# for a given list of models and a test-set.
+def generalization_accuracy(models, df_test, Ns):
+    tr_accs = []
+    test_accs = []
+    for model in models:
+        tr_acc, df = training_accuracy(model.df_trained)
+        tr_accs.append(tr_acc)
+        
+        test_acc, df_t = testing_accuracy(df_test, model.df_trained, model, model.pfeatures)
+        test_accs.append(test_acc)
+    
+    fig1, ax1 = plt.subplots()
+    ax1.plot(Ns, tr_accs, label = 'Training Accuracy')
+    ax1.plot(Ns, test_accs, label = 'Testing Accuracy')
+    ax1.set_xlabel('N training data size')
+    ax1.set_ylabel('Accuracy %')
+    ax1.set_title('Model Generalization Accuracies')
+    plt.legend()
+    plt.show()
+    return
+    
+    
 #################################################################
 

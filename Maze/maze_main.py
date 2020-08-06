@@ -23,7 +23,7 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 100
+N = 200
 T_max = 25
 max_k = 25
 clustering = 'Agglomerative'
@@ -57,7 +57,7 @@ mazes = {1: 'maze-v0',
          11: 'maze-random-20x20-plus-v0', # has portals 
          12: 'maze-random-30x30-plus-v0'} # has portals 
 
-df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
+#df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
 #print(df)
 
 #################################################################
@@ -98,4 +98,11 @@ df.loc[df['ACTION']==4, 'ACTION'] = 'None'
 f, r = get_maze_transition_reward(mazes[4])
 Q, p, x_df = fitted_Q(100, df, 0.98, 2, [0, 1, 2, 3], f, r, True, 'ExtraTrees')
 pickle.dump(p, open('fitted_Q_policy_N=170.sav', 'wb'))
+'''
+
+# Generate a lot of csvs: 
+'''
+for i in range(33, 50):
+    df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
+    df.to_csv(f'set_{i}.csv')
 '''

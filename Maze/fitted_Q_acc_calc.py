@@ -194,11 +194,38 @@ def plot_all_acc(m_train, p_train, m_test, p_test, Ns):
 # |v_policy/algo - v_opt*|. v_policy/algo is found by randomly generating K 
 # points in the starting cell, simulating over t_max steps, and taking the avg
 # over these K trials. v_opt is the value 
-def value_diff(models, policies, Ns, maze, K, t_max): 
+def value_diff(models, policies, Ns, K, t_max): 
     # first calculate v_opt for this particular maze and t_max steps
+    v_opt = 0
+    s = 0
+    for t in range(t_max):
+        v_opt += R[0, s]
+        #print(R[0, s], v_opt)
+        a = true_pi[s]
+        s_new = P[a, s].argmax()
+        s = s_new
+        #print(s)
     
     # then for each model and policy, run through the K trials and return
     # an array of differences corresponding to each N 
+    n = len(Ns)
+    
+    # for each n of this set:
+    for i in range(n):
+        m = models[i]
+        p = policies[i]
+        
+        if m.pi is None:
+            m.solve_MDP()
+        
+        model_vs = []
+        for k in range(K):
+            v_estim = 0
+            init_x = None # TODO: Add random init point
+            for t in range(t_max):
+                v_estim += 
+        
+    
     pass
 
 
