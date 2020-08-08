@@ -300,6 +300,7 @@ class MDP_model:
         a = P_df['ACTION'].nunique()
         s = P_df['CLUSTER'].nunique()
         n = P_df['NEXT_CLUSTER'].nunique()
+        actions = P_df['ACTION'].unique()
         
         #print(P_df)
         # Take out rows that don't pass statistical alpha test
@@ -313,9 +314,13 @@ class MDP_model:
         # Take out rows where actions or purity below threshold
         P_thresh = P_alph.loc[(P_alph['count']>min_action_obs)&(P_alph['purity']>min_action_purity)]
         
-        # Take out rows where we have missing actions:
+        # Take note of rows where we have missing actions:
         incomplete_clusters = np.where(P_df.groupby('CLUSTER')['ACTION'].count()<a)[0]
-        P_opt = P_thresh.loc[~P_thresh['CLUSTER'].isin(incomplete_clusters)]
+        missing_pairs = []
+        for c in incomplete_clusters:
+            not_present = np.setdiff1d(actions, P_df.loc[P_df['CLUSTER']==c]['ACTION'].unique())
+            for u in not_present:
+                missing_pairs.append((c, u))
         
         #print(P_opt)
         
@@ -323,8 +328,8 @@ class MDP_model:
         P = np.zeros((a, s+1, s+1))
         
         
-        # model tranistions
-        for index, row in P_opt.iterrows():
+        # model transitions
+        for index, row in P_thresh.iterrows():
             x, y, z = row['ACTION'], row['CLUSTER'], row['NEXT_CLUSTER']
             P[x, y, z] = 1 
                 
@@ -342,10 +347,10 @@ class MDP_model:
             c, u = row['CLUSTER'], row['ACTION']
             P[u, c, -1] = 1
             
-        # reinsert transition for clusters taken out by missing actions:
-        for c in incomplete_clusters:
-            for u in range(a):
-                P[u, c, -1] = 1
+        # reinsert transition for missing cluster-action pairs
+        for pair in missing_pairs:
+            c, u = pair
+            P[u, c, -1] = 1
                 
         
         # replacing correct sink node transitions
