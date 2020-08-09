@@ -77,7 +77,7 @@ def get_MDP(df_new):
     R_df = df_new.groupby('CLUSTER')['RISK'].mean()
     
     # check if end state exists, if so make a sink node
-    if 'End' in P_df['NEXT_CLUSTER'].unique():
+    if 'End' in list(P_df['NEXT_CLUSTER'].unique()):
         P_df = P_df.reset_index()
         
         # find goal cluster that leads to sink, then remove
@@ -463,13 +463,17 @@ def model_trajectory(m,
                     f, 
                     x, 
                     f1=0, 
-                    f2=1, 
+                    f2=None, # if f2 is none, only plot f1 over time
                     n=50):
     if m.v is None:
         m.solve_MDP()
     
-    xs = [x[f1]]
-    ys = [x[f2]]
+    if f2 != None:
+        ys = [x[f2]]
+        xs = [x[f1]]
+    else:
+        ys = [x[f1]]
+        xs = range(n+1)
 
     for i in range(n):
         # find current state and action
@@ -481,8 +485,11 @@ def model_trajectory(m,
         if x_new[0] == None:
             break
         
-        xs.append(x_new[f1])
-        ys.append(x_new[f2])
+        if f2 != None:
+            ys.append(x_new[f2])
+            xs.append(x_new[f1])
+        else:
+            ys.append(x_new[f1])
         x = x_new
     
     # TODO: not plot the sink

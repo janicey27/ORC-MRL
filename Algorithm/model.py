@@ -60,7 +60,8 @@ class MDP_model:
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
             n_clusters = None, # number of clusters for KMeans
             random_state = 0,
-            plot = False):
+            plot = False,
+            OutputFlag = 0):
         
         df = data.copy()
             
@@ -80,7 +81,7 @@ class MDP_model:
                                                   n_clusters,
                                                   random_state,
                                                   h,
-                                                  OutputFlag = 0,
+                                                  OutputFlag = OutputFlag,
                                                   cv=cv,
                                                   n=-1,
                                                   plot = plot)
@@ -113,7 +114,7 @@ class MDP_model:
                                           classification=classification,
                                           split_classifier_params = split_classifier_params,
                                           h=h,
-                                          OutputFlag = 0,
+                                          OutputFlag = OutputFlag,
                                           plot = plot)
         
         
@@ -152,7 +153,8 @@ class MDP_model:
             n_clusters = None, # number of clusters for KMeans
             random_state = 0,
             plot = False,
-            optimize = True):
+            optimize = True,
+            OutputFlag = 0):
     
         df = data.copy()
             
@@ -181,7 +183,7 @@ class MDP_model:
                                           classification=classification,
                                           split_classifier_params = split_classifier_params,
                                           h=h,
-                                          OutputFlag = 0,
+                                          OutputFlag = OutputFlag,
                                           plot = plot)
         
         # store all training errors
@@ -206,7 +208,7 @@ class MDP_model:
                                           classification=classification,
                                           split_classifier_params = split_classifier_params,
                                           h=h,
-                                          OutputFlag = 0,
+                                          OutputFlag = OutputFlag,
                                           plot = plot)
         
         # storing trained dataset and predict_cluster function
@@ -302,6 +304,9 @@ class MDP_model:
         n = P_df['NEXT_CLUSTER'].nunique()
         actions = P_df['ACTION'].unique()
         
+        # convert ACTION, CLUSTER, and NEXT_CLUSTER to integers
+        
+        
         #print(P_df)
         # Take out rows that don't pass statistical alpha test
         P_alph = P_df.loc[(1-binom.cdf(P_df['purity']*(P_df['count']), P_df['count'],\
@@ -329,22 +334,22 @@ class MDP_model:
         
         
         # model transitions
-        for index, row in P_thresh.iterrows():
-            x, y, z = row['ACTION'], row['CLUSTER'], row['NEXT_CLUSTER']
+        for row in P_thresh.itertuples():
+            x, y, z = row[2], row[1], row[3] #ACTION, CLUSTER, NEXT_CLUSTER
             P[x, y, z] = 1 
                 
         # reinsert transition for cluster/action pairs taken out by alpha test
         excl_alph = P_df.loc[(1-binom.cdf(P_df['purity']*P_df['count'], P_df['count'],\
                                       0.5))>alpha]
-        for index, row in excl_alph.iterrows():
-            c, u = row['CLUSTER'], row['ACTION']
+        for row in excl_alph.itertuples():
+            c, u = row[1], row[2] #CLUSTER, ACTION
             P[u, c, -1] = 1
             
         # reinsert transition for cluster/action pairs taken out by threshold
         # ALSO INCLUDE NOT SEEN??
         excl = P_df.loc[(P_df['count']<=min_action_obs)|(P_df['purity']<=min_action_purity)]
-        for index, row in excl.iterrows():
-            c, u = row['CLUSTER'], row['ACTION']
+        for row in excl.itertuples():
+            c, u = row[1], row[2] #CLUSTER, ACTION
             P[u, c, -1] = 1
             
         # reinsert transition for missing cluster-action pairs
@@ -355,8 +360,8 @@ class MDP_model:
         
         # replacing correct sink node transitions
         nan = P_df.loc[P_df['count'].isnull()]
-        for index, row in nan.iterrows():
-            c, u, t = row['CLUSTER'], row['ACTION'], row['NEXT_CLUSTER']
+        for row in nan.itertuples():
+            c, u, t = row[1], row[2], row[3] #CLUSTER, ACTION, NEXT_CLUSTER
             P[u, c, t] = 1
         
         # punishment node to itself:

@@ -21,8 +21,12 @@ from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 # RTI on, u2 = 1 when PI on; 0 otherwise for both), and the time horizon t, and 
 # computes the transition from x_0 to x_t having taken action u1 u2. Returns 
 # the new features x_t (T1, T2... V, E)
-def f(x, u, t, dt = 0.0005):
+def f(x, u, t=5, dt = 0.0005, log=True):
+    #print(x)
+    if log: 
+        x = np.array([10**y for y in x])
     T1, T2, Ts1, Ts2, V, E = x
+    #print(T1, T2, Ts1, Ts2, V, E)
     try:
         u1, u2 = u
     except: 
@@ -83,7 +87,12 @@ def f(x, u, t, dt = 0.0005):
         V = V_new
         #print((T1, T2, Ts1, Ts2, V, E))
         
-    return (T1, T2, Ts1, Ts2, V, E)
+    x_new = (T1, T2, Ts1, Ts2, V, E)
+    
+    if log:
+        return np.log10(x_new)
+    
+    return x_new
 
 # c_a() takes in a tuple of features x, and a tuple of actions u = (u1, u2),
 # and returns the action-dependent cost of the current state-action pair
@@ -273,9 +282,9 @@ def gen(N,
         T, 
         r, 
         cost, # str: 'c_a' or 'c_r' depending on reward dependence
-        p): # a trained policy model
+        p,
+        x_init= (163573, 5, 11945, 46, 63919, 24)): # a trained policy model
     # starting in non-healthy steady state
-    x_init = (163573, 5, 11945, 46, 63919, 24)
     
     transitions = []
     # creating patient transitions
@@ -287,7 +296,7 @@ def gen(N,
                 u = (np.random.randint(0, 2), np.random.randint(0, 2))
             else:
                 u = p.get_action(x)
-            xt = f(x, u, 5) # simulating 5 day change
+            xt = f(x, u, 5, log=False) # simulating 5 day change
             if cost == 'c_a':
                 c = c_a(x, u)
             if cost == 'c_r':
@@ -314,17 +323,25 @@ def createSamples(N,
                   r,
                   cost, # 'c_a', 'c_r', or 'dist' 
                   eps, # if cost == 'dist', thresh is threshold around healthy & unhealthy points
+                  id_start = 0,
                   p=None): 
     
     # starting in non-healthy steady state
     unhealthy = (163573, 5, 11945, 46, 63919, 24)
     healthy = (967839, 621, 76, 6, 415, 353108)
     
+    
     transitions = []
     # creating patient transitions
-    for i in range(N):
+    for i in range(id_start, id_start+N):
         ID = i
-        x = unhealthy
+        x = [0, 0, 0, 0, 0, 0] # TODO: update for randomness in starting state here as well
+        x[0] = np.random.randint(10**5, 10**5.3)
+        x[1] = np.random.randint(10**0.5, 10**1.5)
+        x[2] = np.random.randint(10**3, 10**4.5)
+        x[3] = np.random.randint(10**1, 10**1.8)
+        x[4] = np.random.randint(10**4, 10**5)
+        x[5] = np.random.randint(10**1, 10**2)
         for t in range(T):
             # smaller than r means takes random action, else optimal policy
             TIME = t
@@ -333,12 +350,10 @@ def createSamples(N,
             else:
                 u = p.get_action(x)
             
-            xt = f(x, u, 5) # simulating 5 day change
+            xt = f(x, u, 5, log=False) # simulating 5 day change
             
             if cost == 'dist': 
-                if distance.euclidean(x, unhealthy) < eps:
-                    c = -1
-                elif distance.euclidean(x, healthy) < eps:
+                if distance(x, eps):
                     c = 1
                 else: 
                     c = 0
@@ -347,7 +362,8 @@ def createSamples(N,
             if cost == 'c_r':
                 c = c_r(x)
             a = convert(u)
-            transitions.append([ID, TIME, x, a, c])
+            x_log = np.log10(np.array(x))
+            transitions.append([ID, TIME, x_log, a, c])
             # update new x
             x = xt
             #print('t', t, 'x', x)
@@ -381,7 +397,7 @@ def J(x, policy, T, gamma):
     a = policy.get_action(x)
     for i in range(T):
         total += (gamma**i)*c_a(x, a)
-        x = f(x, a, 5)
+        x = f(x, a, 5, log=False)
         a = policy.get_action(x)
     return total
 
@@ -396,7 +412,7 @@ def trajectory(f1, f2, actions):
     xs = [np.log10(x[f1])]
     ys = [np.log10(x[f2])]
     for a in actions:
-        xt = f(x, convert(a), 5)
+        xt = f(x, convert(a), 5, log=False)
         xs.append(np.log10(xt[f1]))
         ys.append(np.log10(xt[f2]))
         x = xt
@@ -423,15 +439,18 @@ def trajectory(f1, f2, actions):
     
 
 # distance() takes a state x and a percentage error eps, and 
-# returns True if x is within eps of healthy state for all 6 features
+# returns True if log10(x) is within eps of healthy state for all 6 features
 def distance(x, eps):
-    healthy = (967839, 621, 76, 6, 415, 353108)
+    healthy = np.array((967839, 621, 76, 6, 415, 353108))
+    healthy_log = np.log10(healthy)
+    x = np.log10(np.array(x))
     h = True
     for i in range(6): 
-        if abs(healthy[i] - x[i]) > healthy[i]*eps:
+        if abs(healthy_log[i] - x[i]) > healthy_log[i]*eps:
             h = False
             break
     return h
+
 
 # distance_df() takes a dataframe and and epsilon, and returns a dataframe
 # of True/Falses as well as the count of each
@@ -490,7 +509,88 @@ def get_dist(x):
         if d > max_d:
             max_d = d
     return max_d
+
+
+# create_opt_samples() takes a policy and int opt_s deciding how many paths of optimal
+# policy to generate, generates according to policy for first 80 steps, 
+# then takes (0, 0) for next steps. Takes another int rand_s that determines
+# number of semi-random paths to generate, following 0.15 randomness and policy 
+# p the rest of the time. Returns a dataframe of this full path, in form suitable
+# to run the algorithm. 
+def create_opt_samples(p, opt_s, rand_s, eps, t_max):
     
+    df_final = pd.DataFrame()
+    # first create the optimal samples
+    for i in range(opt_s):
+        # first 80 steps according to policy
+        df_opt = createSamples(1, 80, 0, 'dist', eps, i, p)
+        x = df_opt.iloc[-1, 2:8]
+        x = 10**x
+        
+        # create next 120 steps according to (0, 0) action
+        transitions = []
+        ID = i
+        for t in range(80, t_max):
+            TIME = t
+            u = (0, 0)
+            xt = f(x, u, 5, log=False) # simulating 5 day change
+            
+            if distance(xt, eps):
+                c = 1
+            else: 
+                c = 0
+
+            a = convert(u)
+            x_log = np.log10(np.array(xt))
+            transitions.append([ID, TIME, x_log, a, c])
+            x = xt
+    
+        df = pd.DataFrame(transitions, columns=['ID', 'TIME', 'x', 'ACTION', 'RISK'])
+        features = df['x'].apply(pd.Series)
+        features = features.rename(columns = lambda x : 'FEATURE_' + str(x))
+        
+        df_new = pd.concat([df.iloc[:, :2], features, df.iloc[:, 3:]], axis=1)
+        df_opt = pd.concat([df_opt, df_new], ignore_index=True)
+        df_final = pd.concat([df_final, df_opt], ignore_index=True)
+    
+    # next create the partially random samples
+    df_rand = createSamples(rand_s, t_max, 0.15, 'dist', eps, opt_s, p)
+    df_final = pd.concat([df_final, df_rand], ignore_index=True)
+        
+    return df_final
+
+
+# create_opt_path() takes a starting state x_init, generates according to policy
+# for first 80 steps, then takes (0, 0) for next steps. Returns a dataframe
+# of this full path
+def create_opt_path(x_init, p, plot=False):
+    df10a = gen(1, 80, 0, 'c_a', p, x_init)
+    x = df10a['x_t'].iloc[-1]
+    
+    transitions = []
+    for t in range(120):
+        # smaller than r means takes random action, else optimal policy
+        u = (0, 0)
+        xt = f(x, u, 5, log=False) # simulating 5 day change
+        c = c_a(x, u)
+        transitions.append([x, u, xt, c])
+        # update new x
+        x = xt
+        #print('t', t, 'x', x)
+    
+    df = pd.DataFrame(transitions, columns=['x_t', 'u', 'x_t2', 'c'])
+    
+    df_new = pd.concat([df10a, df], ignore_index=True)
+    
+    if plot:
+        for i in range(6):
+            fig, ax = plt.subplots()
+            ax.plot(df_new['x_t'].apply(lambda x: np.log10(x[i])))
+            plt.show()
+        
+    return df_new 
+
+
 #################################################################
 # Running the experiment
 '''

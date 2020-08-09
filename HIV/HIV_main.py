@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import pandas as pd
+import pickle
 
 import sys
 sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
@@ -29,14 +30,15 @@ N = 100
 T = 200
 clustering = 'Agglomerative'
 n_clusters = None
-distance_threshold = 100000
+distance_threshold = 0.5
 random_state = 0
 pfeatures = 6
 h = -1
-max_k = 30
+max_k = 500
 cv = 5
 th = 0
 classification = 'DecisionTreeClassifier' 
+split_classifier_params = {'random_state':0, 'max_depth':2}
 thresh = 2000 # threshold for dist when deciding risk
 
 #################################################################
@@ -45,13 +47,13 @@ thresh = 2000 # threshold for dist when deciding risk
 #print(df.groupby(['RISK'])['ACTION'].count())
 #df.to_csv('HIV_synthetic_data_large.csv')
 #df = pd.read_csv('HIV_synthetic_data_large.csv')
-df = pd.read_csv('HIV_synthetic_data.csv')
+df = pd.read_csv('df_HIV.csv')
 print('loaded data')
 
 #################################################################
 # Run Algorithm
 m = MDP_model()
-m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'ACTION', 'RISK']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
     max_k, # int: number of iterations
@@ -59,13 +61,19 @@ m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK'
     cv, # number for cross validation
     th, # splitting threshold
     classification, # classification method
+    split_classifier_params,
     clustering,# clustering method from Agglomerative, KMeans, and Birch
     n_clusters, # number of clusters for KMeans
     random_state,
-    plot=True)
+    plot=True,
+    optimize=True,
+    OutputFlag=0)
 
-cs = cluster_size(m.df_trained)
-nc = next_clusters(m.df_trained)
+pickle.dump(m, open('m1_fit_opt.sav', 'wb'))
+
+#cs = cluster_size(m.df_trained)
+#nc = next_clusters(m.df_trained)
+
 #plt.plot([training_value_error(m.df_trained, True, h) for h in range(0, 15)])
 #print(cs)
 #print(nc)
