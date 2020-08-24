@@ -267,10 +267,13 @@ def splitter(df,  # pandas dataFrame
     training_error = []
     
     # determine if the problem has OG cluster
-    if 'OG_CLUSTER' in df.columns:
-        grid = True
-    else:
-        grid = False
+    #if 'OG_CLUSTER' in df.columns:
+        #grid = True
+    #else:
+        #grid = False
+    # TODO: check why testing_acc throws an error here
+    #TEMPORARY CHANGE: 
+    grid = False
     
     k = df['CLUSTER'].nunique() #initial number of clusters 
     nc = k #number of clusters
@@ -286,10 +289,10 @@ def splitter(df,  # pandas dataFrame
         cont = False
         c, a = findContradiction(df_new, th)
         if c != -1:
-            if OutputFlag == 1:
-                print('Cluster Content')
-                print(df_new.groupby(
-                            ['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
+            #if OutputFlag == 1:
+                #print('Cluster Content')
+                #print(df_new.groupby(
+                            #'CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
             
             # finding contradictions and splitting
             a, b = contradiction(df_new, c, a)
@@ -343,8 +346,29 @@ def splitter(df,  # pandas dataFrame
         if nc >= max_k:
             print('Optimal # of clusters reached')
             break
-    if OutputFlag == 1:
-        print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
+        
+        # plot every 20 iterations
+        '''
+        if plot:
+            if i%20 == 0: 
+                its = np.arange(k+1, nc+1)
+                fig2, ax2 = plt.subplots()
+                ax2.plot(its, training_error, label = "Training Error")
+                if testing:
+                    ax2.plot(its, testing_error, label = "Testing Error")
+                if n>0:
+                    ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+                ax2.set_ylim(0)
+                ax2.set_xlabel('# of Clusters')
+                ax2.set_ylabel('Value error')
+                ax2.set_title('Value error by number of clusters')
+                ax2.legend()
+                plt.show()
+        '''
+        
+            
+    #if OutputFlag == 1:
+        #print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
     
     
     # plotting functions

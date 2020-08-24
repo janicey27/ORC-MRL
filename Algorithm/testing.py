@@ -154,6 +154,7 @@ def training_value_error(df_new, #Outpul of algorithm
         while cont:
             #if a == 'None':
                 #break
+            
             v_true = v_true + df_new['RISK'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
             
@@ -173,6 +174,7 @@ def training_value_error(df_new, #Outpul of algorithm
            
             t += 1
             a = df_new['ACTION'].loc[index + t]
+
         if relative:
             E_v = E_v + ((v_true-v_estim)/v_true)**2
         else:
@@ -465,6 +467,7 @@ def model_trajectory(m,
                     f1=0, 
                     f2=None, # if f2 is none, only plot f1 over time
                     n=50):
+    states = []
     if m.v is None:
         m.solve_MDP()
     
@@ -481,6 +484,7 @@ def model_trajectory(m,
         #print(s)
         a = int(m.pi[s])
         #print(a)
+        states.append([s, a])
         x_new = f(x, a)
         if x_new[0] == None:
             break
@@ -491,7 +495,7 @@ def model_trajectory(m,
         else:
             ys.append(x_new[f1])
         x = x_new
-    
+    print('states', states, flush=True)
     # TODO: not plot the sink
     xs = np.array(xs)
     ys = np.array(ys)

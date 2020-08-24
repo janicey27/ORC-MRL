@@ -283,6 +283,7 @@ class MDP_model:
     # and returns the the value and policy. 
     def solve_MDP(self,
                   alpha = 0.2, # statistical alpha threshold
+                  beta = 0.5, # statistical beta threshold
                   min_action_obs = 5, # int: least number of actions that must be seen
                   min_action_purity = 0.3, # float: percentage purity above which is acceptable
                   prob='max', 
@@ -310,7 +311,7 @@ class MDP_model:
         #print(P_df)
         # Take out rows that don't pass statistical alpha test
         P_alph = P_df.loc[(1-binom.cdf(P_df['purity']*(P_df['count']), P_df['count'],\
-                                      0.5))<=alpha]
+                                      beta))<=alpha]
         
         # for old version of self.nc:
         #P_alph = P_df.loc[(1-binom.cdf(P_df['count'], P_df['count']/P_df['purity'],\
@@ -340,7 +341,7 @@ class MDP_model:
                 
         # reinsert transition for cluster/action pairs taken out by alpha test
         excl_alph = P_df.loc[(1-binom.cdf(P_df['purity']*P_df['count'], P_df['count'],\
-                                      0.5))>alpha]
+                                      beta))>alpha]
         for row in excl_alph.itertuples():
             c, u = row[1], row[2] #CLUSTER, ACTION
             P[u, c, -1] = 1
