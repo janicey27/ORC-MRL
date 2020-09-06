@@ -255,6 +255,7 @@ def splitter(df,  # pandas dataFrame
              classification='LogisticRegression',  # string: classification alg
              split_classifier_params = {'random_state':0}, # dict: classification params
              h=5,
+             gamma=1,
              OutputFlag = 1,
              n=-1,
              plot = False):  
@@ -279,6 +280,10 @@ def splitter(df,  # pandas dataFrame
     nc = k #number of clusters
     
     df_new = deepcopy(df)
+    
+    # storing optimal df
+    best_df = None
+    min_error = float('inf')
     
     # Setting progress bar--------------
     split_bar = tqdm(range(max_k-k))
@@ -305,7 +310,7 @@ def splitter(df,  # pandas dataFrame
             
             R2_train = R2_value_training(df_new)
             training_R2.append(R2_train)       
-            train_error = training_value_error(df_new, relative=False, h=h)
+            train_error = training_value_error(df_new, gamma, relative=False, h=h)
             training_error.append(train_error)            
             
             if grid:
@@ -317,7 +322,7 @@ def splitter(df,  # pandas dataFrame
                 model = predict_cluster(df_new, pfeatures)
                 R2_test = R2_value_testing(df_test, df_new, model, pfeatures)
                 testing_R2.append(R2_test)
-                test_error = testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=h)
+                test_error = testing_value_error(df_test, df_new, model, pfeatures, gamma, relative=False,h=h)
                 testing_error.append(test_error)
                 
                 if grid:
@@ -339,6 +344,12 @@ def splitter(df,  # pandas dataFrame
                         print('testing accuracy:', test_acc)
             #print('predictions:', get_predictions(df_new))
             #print(df_new.head())
+            
+            # update optimal dataframe
+            if train_error < min_error: 
+                min_error = train_error
+                best_df = df_new.copy()
+            
             cont = True
             nc += 1
         if not cont:
@@ -348,23 +359,23 @@ def splitter(df,  # pandas dataFrame
             break
         
         # plot every 20 iterations
-        '''
-        if plot:
-            if i%20 == 0: 
-                its = np.arange(k+1, nc+1)
-                fig2, ax2 = plt.subplots()
-                ax2.plot(its, training_error, label = "Training Error")
-                if testing:
-                    ax2.plot(its, testing_error, label = "Testing Error")
-                if n>0:
-                    ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-                ax2.set_ylim(0)
-                ax2.set_xlabel('# of Clusters')
-                ax2.set_ylabel('Value error')
-                ax2.set_title('Value error by number of clusters')
-                ax2.legend()
-                plt.show()
-        '''
+        
+        # if plot:
+        #     if i%20 == 0: 
+        #         its = np.arange(k+1, nc+1)
+        #         fig2, ax2 = plt.subplots()
+        #         ax2.plot(its, training_error, label = "Training Error")
+        #         if testing:
+        #             ax2.plot(its, testing_error, label = "Testing Error")
+        #         if n>0:
+        #             ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+        #         ax2.set_ylim(0)
+        #         ax2.set_xlabel('# of Clusters')
+        #         ax2.set_ylabel('Value error')
+        #         ax2.set_title('Value error by number of clusters')
+        #         ax2.legend()
+        #         plt.show()
+        
         
             
     #if OutputFlag == 1:
@@ -410,7 +421,7 @@ def splitter(df,  # pandas dataFrame
                                   columns = ['Clusters', 'Error'])
         return (df_new,df_train_error,df_test_error)
     
-    return(df_new,df_train_error,testing_error)
+    return(df_new,df_train_error,testing_error, best_df)
 
 #################################################################
 
@@ -428,6 +439,7 @@ def fit_CV(df,
           n_clusters,
           random_state,
           h,
+          gamma=1,
           OutputFlag = 0,
           cv=5,
           n=-1,
@@ -445,6 +457,7 @@ def fit_CV(df,
     df = pd.concat(g).reset_index(drop=True)
     ids = df.groupby(['ID'], sort=False).ngroup()
     df['ID_shuffle'] = ids
+    
     for train_idx, test_idx in gkf.split(df, y=None, groups=df['ID_shuffle']):
 
         df_train = df[df.index.isin(train_idx)]
@@ -465,7 +478,7 @@ def fit_CV(df,
         #################################################################
         # Run Iterative Learning Algorithm
         
-        df_new,training_error,testing_error = splitter(df_init,
+        df_new,training_error,testing_error, best_df = splitter(df_init,
                                           pfeatures,
                                           th,
                                           df_test,
@@ -474,6 +487,7 @@ def fit_CV(df,
                                           classification = classification,
                                           split_classifier_params = split_classifier_params,
                                           h = h, 
+                                          gamma = gamma,
                                           OutputFlag = 0,
                                           n=n,
                                           plot = plot)

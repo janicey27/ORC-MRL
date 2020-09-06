@@ -39,6 +39,7 @@ def predict_cluster(df_new, # dataframe: trained clusters
     }
 
     m = DecisionTreeClassifier()
+    #m = RandomForestClassifier()
     
     m = GridSearchCV(m, params,cv = 5, iid=True) #will return warning if 'iid' param not set to true
 
@@ -114,6 +115,7 @@ def get_MDP(df_new):
 # E((\hat{v}-v)^2) expected error in estimating values (risk) given actions
 # Returns a float of average value error per ID 
 def training_value_error(df_new, #Outpul of algorithm
+                         gamma = 1, # discount factor
                          relative=False, #Output Raw error or RMSE ie ((\hat{v}-v)/v)^2
                          h=5): # Length of forecast. The error is computed on v_h = \sum_{t=h}^H v_t
                                # if h = -1, we forecast the whole path
@@ -155,8 +157,9 @@ def training_value_error(df_new, #Outpul of algorithm
             #if a == 'None':
                 #break
             
-            v_true = v_true + df_new['RISK'].loc[index + t]
-            v_estim = v_estim + R_df.loc[s]
+            v_true = gamma*v_true + df_new['RISK'].loc[index + t]
+            v_estim = gamma*v_estim + R_df.loc[s]
+            #print('v_true', v_true, 'v_estim', v_estim)
             
             try: 
                 df_new['ID'].loc[index+t+1]
@@ -179,6 +182,7 @@ def training_value_error(df_new, #Outpul of algorithm
             E_v = E_v + ((v_true-v_estim)/v_true)**2
         else:
             E_v = E_v + (v_true-v_estim)**2
+            #print('E_v diff:', v_true-v_estim)
     E_v = (E_v/N_train)
     return np.sqrt(E_v)
 
@@ -188,7 +192,13 @@ def training_value_error(df_new, #Outpul of algorithm
 # expected value error given actions and a predicted initial cluster and time
 # horizon h (ifh = -1, we forecast the whole path)
 # Returns a float of sqrt average value error per ID
-def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
+def testing_value_error(df_test, 
+                        df_new, 
+                        model, 
+                        pfeatures,
+                        gamma = 1, # discount factor
+                        relative=False,
+                        h=5):
     E_v = 0
     P_df,R_df = get_MDP(df_new)
     df2 = df_test.reset_index()
@@ -224,8 +234,8 @@ def testing_value_error(df_test, df_new, model, pfeatures,relative=False,h=5):
         
         # predicting path of each ID
         while cont:
-            v_true = v_true + df_test['RISK'].loc[index + t]
-            v_estim = v_estim + R_df.loc[s]
+            v_true = gamma*v_true + df_test['RISK'].loc[index + t]
+            v_estim = gamma*v_estim + R_df.loc[s]
             try: 
                 df_test['ID'].loc[index+t+1]
             except:
@@ -520,7 +530,7 @@ def model_trajectory(m,
     return xs, ys
     
 #################################################################
-    
+
 
 #################################################################
 # Functions for Grid Testing (Predictions, Accuracy, Purity)

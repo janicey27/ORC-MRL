@@ -31,7 +31,7 @@ class MDP_model:
         self.training_error = None # training errors after last split sequence
         self.opt_k = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
-        self.m = None # model for predicting cluster number from features
+        self.m = None # model for predicting cluster number from features #CHANGE NAME
         self.clus_pred_accuracy = None # accuracy score of the cluster prediction function
         self.P_df = None # Transition function of the learnt MDP, includes sink node if end state exists
         self.R_df = None # Reward function of the learnt MDP, includes sink node of reward 0 if end state exists
@@ -51,6 +51,7 @@ class MDP_model:
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
+            gamma=1, # discount value
             max_k=70, # int: max number of clusters
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
@@ -81,6 +82,7 @@ class MDP_model:
                                                   n_clusters,
                                                   random_state,
                                                   h,
+                                                  gamma = gamma, 
                                                   OutputFlag = OutputFlag,
                                                   cv=cv,
                                                   n=-1,
@@ -105,7 +107,7 @@ class MDP_model:
         # change end state to 'end'
         df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
         
-        df_new,training_error,testing_error = splitter(df_init,
+        df_new,training_error,testing_error, best_df = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
                                           df_test = None,
@@ -114,6 +116,7 @@ class MDP_model:
                                           classification=classification,
                                           split_classifier_params = split_classifier_params,
                                           h=h,
+                                          gamma=gamma,
                                           OutputFlag = OutputFlag,
                                           plot = plot)
         
@@ -143,6 +146,7 @@ class MDP_model:
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
+            gamma=1, # discount value
             max_k=70, # int: max number of clusters
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
@@ -174,7 +178,7 @@ class MDP_model:
         print('Clusters Initialized')
         print(df_init)
         
-        df_new,training_error,testing_error = splitter(df_init,
+        df_new,training_error,testing_error, best_df = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
                                           df_test = None,
@@ -183,39 +187,47 @@ class MDP_model:
                                           classification=classification,
                                           split_classifier_params = split_classifier_params,
                                           h=h,
+                                          gamma=gamma,
                                           OutputFlag = OutputFlag,
                                           plot = plot)
         
         # store all training errors
         self.training_error = training_error
         
-        # if optimize, find best cluster and resplit
-        if optimize: 
-            k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
-            for i in range(k):
-                # if clustering is less than k but error within 10^-14, take this
-                if abs(self.training_error['Error'].min() - \
-                       self.training_error.loc[self.training_error['Clusters']==i]['Error'].min()) < 1e-14:
-                    k = i
-                    break
-            self.opt_k = k
-            df_new,training_error,testing_error = splitter(df_init,
-                                          pfeatures=self.pfeatures,
-                                          th=th,
-                                          df_test = None,
-                                          testing = False,
-                                          max_k = self.opt_k,
-                                          classification=classification,
-                                          split_classifier_params = split_classifier_params,
-                                          h=h,
-                                          OutputFlag = OutputFlag,
-                                          plot = plot)
+        # # if optimize, find best cluster and resplit
+        # if optimize: 
+        #     k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
+        #     for i in range(k):
+        #         # if clustering is less than k but error within 10^-14, take this
+        #         if abs(self.training_error['Error'].min() - \
+        #                self.training_error.loc[self.training_error['Clusters']==i]['Error'].min()) < 1e-14:
+        #             k = i
+        #             break
+        #     self.opt_k = k
+        #     df_new,training_error,testing_error = splitter(df_init,
+        #                                   pfeatures=self.pfeatures,
+        #                                   th=th,
+        #                                   df_test = None,
+        #                                   testing = False,
+        #                                   max_k = self.opt_k,
+        #                                   classification=classification,
+        #                                   split_classifier_params = split_classifier_params,
+        #                                   h=h,
+        #                                   gamma=gamma,
+        #                                   OutputFlag = OutputFlag,
+        #                                   plot = plot)
         
         # storing trained dataset and predict_cluster function
-        self.df_trained = df_new
-        self.m = predict_cluster(df_new, self.pfeatures)
-        pred = self.m.predict(df_new.iloc[:, 2:2+self.pfeatures])
-        self.clus_pred_accuracy = accuracy_score(pred, df_new['CLUSTER'])
+        if optimize:
+            self.df_trained = best_df
+            k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
+            self.opt_k = k
+        else:
+            self.df_trained = df_new
+            
+        self.m = predict_cluster(self.df_trained, self.pfeatures)
+        pred = self.m.predict(self.df_trained.iloc[:, 2:2+self.pfeatures])
+        self.clus_pred_accuracy = accuracy_score(pred, self.df_trained['CLUSTER'])
         
         # store P_df and R_df values
         P_df,R_df = get_MDP(self.df_trained)
@@ -223,7 +235,7 @@ class MDP_model:
         self.R_df = R_df
         
         # store next_clusters dataframe
-        self.nc = next_clusters(df_new)
+        self.nc = next_clusters(self.df_trained)
     
     # predict() takes a list of features and a time horizon, and returns 
     # the predicted value after all actions are taken in order
