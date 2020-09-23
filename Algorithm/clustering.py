@@ -27,6 +27,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import GroupKFold
 #from xgboost import XGBClassifier
+from sklearn.model_selection import GridSearchCV
 from collections import Counter
 from itertools import groupby
 from operator import itemgetter
@@ -195,12 +196,17 @@ def split(df,  # pandas dataFrame
         m = LogisticRegressionCV(**split_classifier_params)
     elif classification == 'DecisionTreeClassifier':
         m = DecisionTreeClassifier(**split_classifier_params)
-#        params = {
-#        'max_depth': [3, 4, 6, 10,None]
-#        }
-#        m = GridSearchCV(m, params,cv = 5)
+        params = {
+        'max_depth': [3, None]
+        }
+        m = GridSearchCV(m, params,cv = 5)
     elif classification == 'RandomForestClassifier':
         m = RandomForestClassifier(**split_classifier_params)
+        m = DecisionTreeClassifier(**split_classifier_params)
+        params = {
+        'max_depth': [3, None]
+        }
+        m = GridSearchCV(m, params,cv = 5)
     #elif classification == 'XGBClassifier':
         #m = XGBClassifier()        
     elif classification == 'MLPClassifier':
@@ -212,6 +218,7 @@ def split(df,  # pandas dataFrame
     
     
     m.fit(tr_X, tr_y.values.ravel())
+    score = m.best_score_
 
 
     ids = g2.index.values
@@ -237,7 +244,7 @@ def split(df,  # pandas dataFrame
     df.loc[(df.index.isin(newids)) & 
            (df['ID']== df['ID'].shift(-1)), 'NEXT_CLUSTER'] = k
 
-    return(df)
+    return df, score
 
 
 # splitter() is the wrap-up function. Takes as parameters a dataframe df,
@@ -266,6 +273,8 @@ def splitter(df,  # pandas dataFrame
     testing_acc = []
     testing_error = []
     training_error = []
+    
+    split_scores = []
     
     # determine if the problem has OG cluster
     #if 'OG_CLUSTER' in df.columns:
@@ -304,8 +313,8 @@ def splitter(df,  # pandas dataFrame
             
             if OutputFlag == 1:
                 print('Cluster splitted', c,'| Action causing contradiction:', a, '| Cluster most elements went to:', b)
-            df_new = split(df_new, c, a, b, pfeatures, nc, classification,split_classifier_params)
-            
+            df_new, score = split(df_new, c, a, b, pfeatures, nc, classification,split_classifier_params)
+            split_scores.append(score)
             # error and accuracy calculations
             
             R2_train = R2_value_training(df_new)
@@ -360,21 +369,21 @@ def splitter(df,  # pandas dataFrame
         
         # plot every 20 iterations
         
-        # if plot:
-        #     if i%20 == 0: 
-        #         its = np.arange(k+1, nc+1)
-        #         fig2, ax2 = plt.subplots()
-        #         ax2.plot(its, training_error, label = "Training Error")
-        #         if testing:
-        #             ax2.plot(its, testing_error, label = "Testing Error")
-        #         if n>0:
-        #             ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
-        #         ax2.set_ylim(0)
-        #         ax2.set_xlabel('# of Clusters')
-        #         ax2.set_ylabel('Value error')
-        #         ax2.set_title('Value error by number of clusters')
-        #         ax2.legend()
-        #         plt.show()
+        if plot:
+            if i%20 == 0: 
+                its = np.arange(k+1, nc+1)
+                fig2, ax2 = plt.subplots()
+                ax2.plot(its, training_error, label = "Training Error")
+                if testing:
+                    ax2.plot(its, testing_error, label = "Testing Error")
+                if n>0:
+                    ax2.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
+                ax2.set_ylim(0)
+                ax2.set_xlabel('# of Clusters')
+                ax2.set_ylabel('Value error')
+                ax2.set_title('Value error by number of clusters')
+                ax2.legend()
+                plt.show()
         
         
             
@@ -419,9 +428,8 @@ def splitter(df,  # pandas dataFrame
     if testing:
         df_test_error = pd.DataFrame(list(zip(its, testing_error)), \
                                   columns = ['Clusters', 'Error'])
-        return (df_new,df_train_error,df_test_error)
-    
-    return(df_new,df_train_error,testing_error, best_df)
+        return (df_new,df_train_error,df_test_error, best_df, split_scores)
+    return(df_new,df_train_error,testing_error, best_df, split_scores)
 
 #################################################################
 
@@ -478,7 +486,7 @@ def fit_CV(df,
         #################################################################
         # Run Iterative Learning Algorithm
         
-        df_new,training_error,testing_error, best_df = splitter(df_init,
+        df_new,training_error,testing_error, best_df, split_scores = splitter(df_init,
                                           pfeatures,
                                           th,
                                           df_test,
@@ -525,4 +533,4 @@ def fit_CV(df,
         ax1.set_title('Mean CV Error and Accuracy During Splitting')
         ax1.legend()
     
-    return (cv_training_error,cv_testing_error)
+    return (cv_training_error,cv_testing_error, split_scores)

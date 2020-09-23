@@ -23,9 +23,9 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 200
+N = 50
 T_max = 25
-max_k = 25
+max_k = 15
 clustering = 'Agglomerative'
 n_clusters = None
 distance_threshold = 0.5
@@ -35,6 +35,7 @@ actions = [0, 1, 2, 3]
 h = -1
 cv = 5
 th = 0
+gamma = 1
 classification = 'DecisionTreeClassifier'
 #classification = 'RandomForestClassifier'
 split_classifier_params = {'random_state':0, 'max_depth':2}
@@ -57,16 +58,18 @@ mazes = {1: 'maze-v0',
          11: 'maze-random-20x20-plus-v0', # has portals 
          12: 'maze-random-30x30-plus-v0'} # has portals 
 
-#df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
+df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
+#df.to_csv('set_43.csv')
 #print(df)
 
 #################################################################
 # Run Algorithm
-'''
+
 m = MDP_model()
-m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
+    gamma, # discount factor
     max_k, # int: number of iterations
     distance_threshold, # clustering diameter for Agglomerative clustering
     cv, # number for cross validation
@@ -76,9 +79,9 @@ m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', '
     clustering,# clustering method from Agglomerative, KMeans, and Birch
     n_clusters, # number of clusters for KMeans
     random_state,
-    plot=True,
-    optimize=True)
-'''
+    plot=True)
+    #optimize=False)
+
 
 #################################################################
 # Loading csv

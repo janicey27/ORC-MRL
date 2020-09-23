@@ -478,6 +478,7 @@ def model_trajectory(m,
                     f2=None, # if f2 is none, only plot f1 over time
                     n=50):
     states = []
+    all_vecs = []
     if m.v is None:
         m.solve_MDP()
     
@@ -504,6 +505,7 @@ def model_trajectory(m,
             xs.append(x_new[f1])
         else:
             ys.append(x_new[f1])
+        all_vecs.append(x_new)
         x = x_new
     print('states', states, flush=True)
     # TODO: not plot the sink
@@ -527,7 +529,7 @@ def model_trajectory(m,
     #plt.ylim(-l+0.5, 0.5)
     #plt.xlim(-.5, l-0.5)
     plt.show()
-    return xs, ys
+    return xs, ys, all_vecs
     
 #################################################################
 
@@ -621,6 +623,27 @@ def generalization_accuracy(models, df_test, Ns):
     plt.show()
     return
     
+# takes df of optimal policies
+def policy_accuracy(m, df):
+    if m.v is None:
+        m.solve_MDP()
+
+
+    correct = 0
+    df = df.loc[df['ACTION']!= 'None']
+    # iterating through every line and comparing 
+    for index, row in df.iterrows():
+        # predicted action: 
+        s = m.m.predict(np.array(row[2:2+m.pfeatures]).reshape(1,-1))
+        #s = m.df_trained.iloc[index]['CLUSTER']
+        a = m.pi[s]
+
+        # real action:
+        a_true = row['ACTION']
+        if a == a_true:
+            correct += 1
+    total = df.shape[0]
+    return correct/total
     
 #################################################################
 

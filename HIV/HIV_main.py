@@ -20,7 +20,7 @@ sys.path.append('/Users/janiceyang/Dropbox (MIT)/ORC UROP/Opioids/Algorithm/')
 
 #from MDPtools import *
 from model import MDP_model
-from HIV_functions import createSamples
+from HIV_functions import createSamples, create_opt_samples
 #from clustering import *
 from testing import cluster_size, next_clusters, training_value_error
 #################################################################
@@ -34,11 +34,12 @@ distance_threshold = 0.5
 random_state = 0
 pfeatures = 6
 h = -1
-max_k = 500
+gamma = 0.98
+max_k = 1000
 cv = 5
 th = 0
 classification = 'DecisionTreeClassifier' 
-split_classifier_params = {'random_state':0, 'max_depth':2}
+split_classifier_params = {'random_state':0}
 thresh = 2000 # threshold for dist when deciding risk
 
 #################################################################
@@ -46,8 +47,24 @@ thresh = 2000 # threshold for dist when deciding risk
 #df = createSamples(N, T, 1, 'c_r', None)
 #print(df.groupby(['RISK'])['ACTION'].count())
 #df.to_csv('HIV_synthetic_data_large.csv')
+
+eps_vec = pickle.load(open('eps_vec_150.sav', 'rb'))
+p10 = pickle.load(open('p10.sav', 'rb'))
+df = create_opt_samples(p10, 60, 40, 180, eps_vec)
+df.to_csv('df_HIV8.csv', index=False)
+
+
 #df = pd.read_csv('HIV_synthetic_data_large.csv')
-df = pd.read_csv('df_HIV.csv')
+df = pd.read_csv('HIV_huge2.csv')
+
+# change actions to int
+try:
+    df.drop(columns=['Unnamed: 0'], inplace=True)
+except:
+    pass
+df.loc[df['ACTION']=='None', 'ACTION'] = 4
+df['ACTION'] = pd.to_numeric(df['ACTION'], downcast='integer')
+df.loc[df['ACTION']==4, 'ACTION'] = 'None'
 print('loaded data')
 
 #################################################################
@@ -56,6 +73,7 @@ m = MDP_model()
 m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'ACTION', 'RISK']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
+    gamma, # discount factor
     max_k, # int: number of iterations
     distance_threshold, # clustering diameter for Agglomerative clustering
     cv, # number for cross validation
@@ -67,9 +85,9 @@ m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'ACTION',
     random_state,
     plot=True,
     optimize=True,
-    OutputFlag=0)
+    OutputFlag=1)
 
-pickle.dump(m, open('m1_fit_opt.sav', 'wb'))
+pickle.dump(m, open('m7_fit_opt_new.sav', 'wb'))
 
 #cs = cluster_size(m.df_trained)
 #nc = next_clusters(m.df_trained)

@@ -29,6 +29,7 @@ class MDP_model:
         self.CV_error = None # error at minimum point of CV
         self.CV_error_all = None # errors of different clusters after CV
         self.training_error = None # training errors after last split sequence
+        self.split_scores = None # cv error from splitter
         self.opt_k = None # number of clusters in optimal clustering
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features #CHANGE NAME
@@ -71,7 +72,7 @@ class MDP_model:
         self.pfeatures = pfeatures
         
         # run cross validation on the data to find best clusters
-        cv_training_error,cv_testing_error =fit_CV(self.df,
+        cv_training_error,cv_testing_error, split_scores =fit_CV(self.df,
                                                   self.pfeatures,
                                                   th,
                                                   clustering,
@@ -107,7 +108,7 @@ class MDP_model:
         # change end state to 'end'
         df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
         
-        df_new,training_error,testing_error, best_df = splitter(df_init,
+        df_new,training_error,testing_error, best_df, split_scores = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
                                           df_test = None,
@@ -129,6 +130,7 @@ class MDP_model:
         
         # store final training error
         self.training_error = training_value_error(self.df_trained)
+        self.split_scores = split_scores
         
         
         # store P_df and R_df values
@@ -178,7 +180,7 @@ class MDP_model:
         print('Clusters Initialized')
         print(df_init)
         
-        df_new,training_error,testing_error, best_df = splitter(df_init,
+        df_new,training_error,testing_error, best_df, split_scores = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
                                           df_test = None,
@@ -193,6 +195,7 @@ class MDP_model:
         
         # store all training errors
         self.training_error = training_error
+        self.split_scores = split_scores
         
         # # if optimize, find best cluster and resplit
         # if optimize: 
@@ -411,13 +414,19 @@ class MDP_model:
                              f2=1, # index of feature 2 to be plotted
                              n=30): # points to be plotted
     
-        xs, ys = model_trajectory(self, f, x, f1, f2, n)
-        return xs, ys
+        xs, ys, all_vecs = model_trajectory(self, f, x, f1, f2, n)
+        return xs, ys # TODO: return all vectors and clusters only
     
     
     # update_nc() allows self.nc to be updated for models that were saved 
     # before the 'COUNT' issue in next_clusters was resolved
     def update_nc(self):
         self.nc = next_clusters(self.df_trained)
+        return
+    
+    
+    # update_predictor
+    def update_predictor(self, predictor):
+        self.m = predictor
         return
     

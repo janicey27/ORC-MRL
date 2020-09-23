@@ -27,6 +27,7 @@ def f(x, u, t=5, dt = 0.0005, log=True):
         x = np.array([10**y for y in x])
     T1, T2, Ts1, Ts2, V, E = x
     #print(T1, T2, Ts1, Ts2, V, E)
+    
     try:
         u1, u2 = u
     except: 
@@ -322,26 +323,38 @@ def createSamples(N,
                   T,
                   r,
                   cost, # 'c_a', 'c_r', or 'dist' 
-                  eps, # if cost == 'dist', thresh is threshold around healthy & unhealthy points
+                  epsilon_vec = 6*[0.05],# if cost == 'dist', epsilon threshold around healthy point
+                                          # to be considered healthy
                   id_start = 0,
                   p=None): 
     
     # starting in non-healthy steady state
     unhealthy = (163573, 5, 11945, 46, 63919, 24)
     healthy = (967839, 621, 76, 6, 415, 353108)
-    
+    log_unhealth = np.log10(np.array(unhealthy))
     
     transitions = []
     # creating patient transitions
     for i in range(id_start, id_start+N):
         ID = i
-        x = [0, 0, 0, 0, 0, 0] # TODO: update for randomness in starting state here as well
-        x[0] = np.random.randint(10**5, 10**5.3)
-        x[1] = np.random.randint(10**0.5, 10**1.5)
-        x[2] = np.random.randint(10**3, 10**4.5)
-        x[3] = np.random.randint(10**1, 10**1.8)
-        x[4] = np.random.randint(10**4, 10**5)
-        x[5] = np.random.randint(10**1, 10**2)
+        
+        x = [10**(log_unhealth[i] +0.1*epsilon_vec[i]*log_unhealth[i]*\
+                  (1-2*np.random.rand())) for i in range(6)]
+        #x = unhealthy
+        #x = [0, 0, 0, 0, 0, 0] # TODO: update for randomness in starting state here as well
+        #x[0] = np.random.randint(10**5, 10**5.3)
+        #x[1] = np.random.randint(10**0.5, 10**1.5)
+        #x[2] = np.random.randint(10**3, 10**4.5)
+        #x[3] = np.random.randint(10**1, 10**1.8)
+        #x[4] = np.random.randint(10**4, 10**5)
+        #x[5] = np.random.randint(10**1, 10**2)
+        
+        #x[0] = np.random.randint(160000, 165000)
+        #x[1] = np.random.randint(3, 7)
+        #x[2] = np.random.randint(10000, 12500)
+        #x[3] = np.random.randint(40, 50)
+        #x[4] = np.random.randint(62000, 65000)
+        #x[5] = np.random.randint(20, 30)
         for t in range(T):
             # smaller than r means takes random action, else optimal policy
             TIME = t
@@ -351,10 +364,14 @@ def createSamples(N,
                 u = p.get_action(x)
             
             xt = f(x, u, 5, log=False) # simulating 5 day change
+            x_log = np.log10(np.array(x))
             
             if cost == 'dist': 
-                if distance(x, eps):
+                if is_healthy(x, epsilon_vec):
                     c = 1
+                    # if we reach healthy, break
+                    transitions.append([ID, TIME, x_log, 'None', c])
+                    break
                 else: 
                     c = 0
             if cost == 'c_a':
@@ -362,11 +379,11 @@ def createSamples(N,
             if cost == 'c_r':
                 c = c_r(x)
             a = convert(u)
-            x_log = np.log10(np.array(x))
             transitions.append([ID, TIME, x_log, a, c])
             # update new x
             x = xt
             #print('t', t, 'x', x)
+        print(f'path {i} completed')
     #print(transitions)
     
     df = pd.DataFrame(transitions, columns=['ID', 'TIME', 'x', 'ACTION', 'RISK'])
@@ -517,32 +534,33 @@ def get_dist(x):
 # number of semi-random paths to generate, following 0.15 randomness and policy 
 # p the rest of the time. Returns a dataframe of this full path, in form suitable
 # to run the algorithm. 
-def create_opt_samples(p, opt_s, rand_s, eps, t_max):
+def create_opt_samples(p, opt_s, rand_s, t_max, epsilon_vec):
     
     df_final = pd.DataFrame()
     # first create the optimal samples
     for i in range(opt_s):
         # first 80 steps according to policy
-        df_opt = createSamples(1, 80, 0, 'dist', eps, i, p)
+        df_opt = createSamples(1, 80, 0, 'dist', epsilon_vec, i, p)
         x = df_opt.iloc[-1, 2:8]
-        x = 10**x
         
-        # create next 120 steps according to (0, 0) action
+        # create next steps according to (0, 0) action
         transitions = []
         ID = i
         for t in range(80, t_max):
             TIME = t
             u = (0, 0)
-            xt = f(x, u, 5, log=False) # simulating 5 day change
+            xt = f(x, u, 5, log=True) # simulating 5 day change
             
-            if distance(xt, eps):
+            if is_healthy(xt, epsilon_vec):
                 c = 1
+                transitions.append([ID, TIME, xt, 'None', c])
+                break
             else: 
                 c = 0
+                c = -1/t_max
 
             a = convert(u)
-            x_log = np.log10(np.array(xt))
-            transitions.append([ID, TIME, x_log, a, c])
+            transitions.append([ID, TIME, xt, a, c])
             x = xt
     
         df = pd.DataFrame(transitions, columns=['ID', 'TIME', 'x', 'ACTION', 'RISK'])
@@ -552,10 +570,16 @@ def create_opt_samples(p, opt_s, rand_s, eps, t_max):
         df_new = pd.concat([df.iloc[:, :2], features, df.iloc[:, 3:]], axis=1)
         df_opt = pd.concat([df_opt, df_new], ignore_index=True)
         df_final = pd.concat([df_final, df_opt], ignore_index=True)
+        
+        # save sporadically 
+        if i%10==0: 
+            df_final.to_csv('HIV_temp.csv', index=False)
     
     # next create the partially random samples
-    df_rand = createSamples(rand_s, t_max, 0.15, 'dist', eps, opt_s, p)
+    df_rand = createSamples(rand_s, t_max, 0.15, 'dist', epsilon_vec, opt_s, p)
     df_final = pd.concat([df_final, df_rand], ignore_index=True)
+    df_final.loc[df_final['RISK']==0, 'RISK'] = -1/t_max
+    df_final.to_csv('HIV_temp.csv', index=False)
         
     return df_final
 
@@ -622,4 +646,91 @@ for i in range(4):
     print(df_test[['x_t', 'c']])
 
 '''
+
+'''
+The following code attempts at finding the 'right' epsilon to define being 
+close to the healthy state. A state is said to be healthy if each of its 
+coordinates i is within epsilon_i of the i-th coordinate of the healthy state. 
+epsilon defines naturaly a healthy set in the space.
+One propriety that we seek is that once we get into the healthy set, we always
+stay in the healthy set when we take action (0,0).
+The following code attemps to define an epsilon verifying this property.
+'''
+
+#Determines if x belongs to the healthy set defined by epsilon_vec. 
+def is_healthy(x, #State to evaluate, defined by vector of features
+               epsilon_vec,#Vector giving the epsilon treshold for every
+                           #coordinate. x is healthy if each coordinate i is
+                           #within epsilon_i of the i-th coordinate of 
+                           #the healthy state
+               healthy = (967839, 621, 76, 6, 415, 353108)):
+    h=True
+    k = len(x)
+    for i in range(k):
+        if abs(x[i]-np.log10(healthy[i]))>epsilon_vec[i]*np.log10(healthy[i]):
+            h = False
+    return h
+
+
+
+# Finds the smallest epsilon_i for each coordinates, such that starting from 
+# step k in the treatment, all the features are within epsilon_i of the healthy
+# state.
+def epsilon_bound_from(k,
+                       path,
+                       healthy = (967839, 621, 76, 6, 415, 353108)):
+    epsilon_vec = np.zeros(6)
+    H = len(path)
+    for j in range(k,H):
+        x = np.array(path.iloc[j].iloc[2:8])
+        for i in range(6):
+            # we add the 1.001 for the rounding error. Such that the pts equal 
+            # to the treshold are also in the set in the accepted range.
+            epsilon_vec[i] = max(epsilon_vec[i],1.001* \
+                       abs(1-x[i]/np.log10(healthy[i])))
+    return epsilon_vec
+
+
+
+
+#Plots the evolution of the feature of each path and the epsilon treshold
+#defining the healthy set.
+def plot_evolution(path,
+                   epsilon_vec,
+                   healthy = (967839, 621, 76, 6, 415, 353108)):
+    log_healthy = np.log10(healthy)
+    for i in range(6):
+        plt.figure()
+        abs(1 - path['FEATURE_'+str(i)]/log_healthy[i]).plot()
+        plt.hlines(epsilon_vec[i],0,len(path), colors = 'r')
+        plt.show()
+    
+
+#Testing if we pick a state randomly in the set defined by epsilon, does the 
+#transition taking action (0,0) leads to smth remaining in the set. Function
+#returns the percentage of points remaining in the set. The higher the better.
+def epsilon_stability(epsilon_vec, #Vector of tresholds for each coordinate.
+                      M=100, #Number of random samples.
+                      healthy = (967839, 621, 76, 6, 415, 353108)):
+    log_healthy = np.log10(healthy)
+    b = []
+    for k in range(M):
+        x = [10**(log_healthy[i] +epsilon_vec[i]*log_healthy[i]*\
+                  (1-2*np.random.rand())) for i in range(6)]
+        y = f(x, (0,0), 5, log=False)
+        y = np.log10(y)
+        b.append(is_healthy(y,epsilon_vec))
+    return np.mean(b)
+    
+
+##Example of run:
+# =============================================================================
+# m = pickle.load(open('m4_fit_opt.sav','rb'))
+# path = m.df[m.df['ID']==0]
+# epsilon_vec = epsilon_bound_from(200, path)
+# print('Stability of treshold:',epsilon_stability(epsilon_vec, M=200))
+# #Add column indicating if a state is healthy
+# df['ishealthy'] = df.apply(lambda row: is_healthy(np.array(row.iloc[2:8]), \
+#   epsilon_vec), axis=1)
+# =============================================================================
     
