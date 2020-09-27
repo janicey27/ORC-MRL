@@ -23,9 +23,9 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 50
+N = 150
 T_max = 25
-max_k = 15
+max_k = 25
 clustering = 'Agglomerative'
 n_clusters = None
 distance_threshold = 0.5
@@ -66,7 +66,7 @@ df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
 # Run Algorithm
 
 m = MDP_model()
-m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
     gamma, # discount factor
@@ -79,8 +79,8 @@ m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK'
     clustering,# clustering method from Agglomerative, KMeans, and Birch
     n_clusters, # number of clusters for KMeans
     random_state,
-    plot=True)
-    #optimize=False)
+    plot=True,
+    optimize=True)
 
 
 #################################################################

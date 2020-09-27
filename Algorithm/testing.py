@@ -380,13 +380,16 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
 # plot_features() takes in a dataframe and two features, and plots the data
 # to illustrate the noise in each cluster
 def plot_features(df, x, y, c='CLUSTER'):
-    df.plot.scatter(x=x,
+    ax = df.plot.scatter(x=x,
                       y=y,
                       c=c,
                       colormap='tab20')
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
-    plt.show()
+    ax.set_xlabel(x)
+    ax.set_ylabel(y)    
+    plt.axis('scaled')
+    #plt.show()
 
 # cluster_size() takes a dataframe, and returns the main statistics of each
 # cluster in a dataframe
@@ -621,7 +624,7 @@ def generalization_accuracy(models, df_test, Ns):
     ax1.set_title('Model Generalization Accuracies')
     plt.legend()
     plt.show()
-    return
+    return tr_accs, test_accs
     
 # takes df of optimal policies
 def policy_accuracy(m, df):

@@ -227,6 +227,7 @@ class MDP_model:
             self.opt_k = k
         else:
             self.df_trained = df_new
+            self.opt_k = self.training_error['Clusters'].max()
             
         self.m = predict_cluster(self.df_trained, self.pfeatures)
         pred = self.m.predict(self.df_trained.iloc[:, 2:2+self.pfeatures])

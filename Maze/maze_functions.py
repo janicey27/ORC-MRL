@@ -642,7 +642,108 @@ class policy:
         return self.actions[i]
     
     
-
+# value_diff() takes a list of models, and the real transitions calculates the difference between values
+# |v_policy/algo - v_opt*|. v_policy/algo is found by randomly generating K 
+# points in the starting cell, simulating over t_max steps, and taking the avg
+# over these K trials. v_opt is the value taking the optimal policy
+def value_diff(models, Ns, K, t_max, P, R, f, r): 
+    # first calculate v_opt for this particular maze and t_max steps
+    v_opt = 0
+    s = 0
+    true_v, true_pi = SolveMDP(P, R, prob='max')
+    for t in range(t_max):
+        v_opt += R[0, s]
+        #print(R[0, s], v_opt)
+        a = true_pi[s]
+        s_new = P[a, s].argmax()
+        s = s_new
+        #print(s)
+    
+    # then for each model and policy, run through the K trials and return
+    # an array of differences corresponding to each N 
+    n = len(Ns)
+    
+    v_alg = []
+    #v_policy = []
+    # for each n of this set:
+    for i in range(n):
+        print('Round N=', Ns[i])
+        m = models[i]
+        #p = policies[i]
+        
+        # calculating average value for this model and policy
+        if m.pi is None:
+            print('resolved model')
+            m.solve_MDP()
+        
+        model_vs = []
+        #policy_vs = []
+        
+        # initialize a list of random starting points (or not, since we won't be able to
+        # keep the rest of the transitions the same randomness anyway)
+        for k in range(K):
+            vm_estim = 0 # initializing model value estimate
+            vp_estim = 0 # initializing policy value estimate
+            
+            x_model = np.array((random.random(), -random.random()))
+            #x_policy = np.array((random.random(), -random.random()))
+            
+            # estimate value for model & policy
+            vm_estim += r(x_model)
+            #vp_estim += r(x_policy)
+            
+            for t in range(t_max):
+                # predict action and upate value for model
+                if x_model[0] == None:
+                    a = 0
+                else:
+                    s = int(m.m.predict([x_model]))
+                    a = m.pi[s]
+                x_model_new = f(x_model, a)
+                vm_estim += r(x_model_new)
+                #print('new model state', x_model_new, 'reward', r(x_model_new))
+                x_model = x_model_new
+                
+                '''
+                # predict action and update value for policy
+                if x_policy[0] == None:
+                    u = 0
+                else:
+                    u = p.get_action(list(x_policy))
+                x_policy_new = f(x_policy, u)
+                vp_estim += r(x_policy_new)
+                #print('new policy state', x_policy_new, 'reward', r(x_policy_new))
+                x_policy = x_policy_new
+                '''
+            
+            # append the total value from this trial
+            model_vs.append(vm_estim)
+            '''
+            policy_vs.append(vp_estim)
+            print('final model value', vm_estim)
+            print('final policy value', vp_estim)
+            '''
+        
+        # average values of all trials for this model/policy
+        model_v = np.mean(model_vs)
+        v_alg.append(model_v)
+        '''
+        policy_v = np.mean(policy_vs)
+        v_policy.append(policy_v)
+        '''
+        #print('model avg for this trial', model_v)
+        #print('policy avg for this trial', policy_v)
+    
+    # calculate differences between values and optimal
+    v_alg_diff = abs(v_alg - v_opt) # np array minus value for all elements --
+                                    #TODO: Check these!!!
+    #print('alg array', v_alg, 'v_opt', v_opt)
+    #print('difference array', v_alg_diff)
+    '''
+    v_policy_diff = abs(v_policy - v_opt)
+    '''
+    
+    return v_alg_diff
         
 # Initialize the "maze" environment
 # =============================================================================
