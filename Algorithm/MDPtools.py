@@ -167,13 +167,15 @@ def Bell(V, P, R, gamma, prob='min', reduced=True):
 
 
 # Value Iteration
-def ValueIteration(P, R, gamma=0.9, epsilon=10**(-10), prob='min'):
+def ValueIteration(P, R, gamma=0.9, epsilon=10**(-10), prob='min', threshold=float('inf')):
     m, n, n = P.shape
-    V = np.ones(n)
+    V = np.zeros(n)
     W = Bell(V, P, R, gamma, prob)
     while np.linalg.norm(V-W) > epsilon:
         V = W
         W = Bell(W, P, R, gamma, prob)
+        if gamma == 1 and max(abs(V))>threshold: # threshold in case the value is actually infinity, used when gamma=1
+            return V
     return W
 
 
@@ -206,7 +208,7 @@ def GetPolicy(V, P, R, gamma, prob='min'):
 
 
 #################################################################
-def SolveMDP(P,R, gamma=0.9, epsilon=10**(-10), p=True, prob='min', method='Value'):
+def SolveMDP(P,R, gamma=0.9, epsilon=10**(-10), p=True, prob='min', method='Value', threshold=float('inf')):
     # P: Transition probability
     # R: Reward matrix
     # epsilon: convergence param of value iteration
@@ -215,7 +217,7 @@ def SolveMDP(P,R, gamma=0.9, epsilon=10**(-10), p=True, prob='min', method='Valu
     if len(R.shape) < 3:
         R = expand(R, n, m)
     if method == 'Value':
-        V = np.array(ValueIteration(P, R, gamma, epsilon, prob))
+        V = np.array(ValueIteration(P, R, gamma, epsilon, prob, threshold))
         pi = np.array(GetPolicy(V, P, R, gamma, prob))
 
     if p:

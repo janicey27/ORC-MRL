@@ -33,7 +33,8 @@ from itertools import groupby
 from operator import itemgetter
 
 from testing import R2_value_training, training_value_error, training_accuracy, \
-    predict_cluster, R2_value_testing, testing_value_error, testing_accuracy
+    predict_cluster, R2_value_testing, testing_value_error, testing_accuracy, \
+        next_clusters
 #################################################################
 
 
@@ -258,6 +259,8 @@ def split(df,  # pandas dataFrame
 def splitter(df,  # pandas dataFrame
              pfeatures,  # integer: number of features
              th, # integer: threshold for minimum split
+             eta = 0.5, # incoherence threshold for splits 
+             precision_thresh = 1e-14, # precision threshold when considering new min value error
              df_test = None, # df_test provided for cross validation
              testing = False, # True if we are cross validating
              max_k = 6, # int: max number of clusters
@@ -276,7 +279,9 @@ def splitter(df,  # pandas dataFrame
     testing_error = []
     training_error = []
     
+    incoherences = []
     split_scores = []
+    thresholds = []
     
     # determine if the problem has OG cluster
     if 'OG_CLUSTER' in df.columns:
@@ -294,7 +299,13 @@ def splitter(df,  # pandas dataFrame
     
     # storing optimal df
     best_df = None
+    opt_k = None
     min_error = float('inf')
+    
+    # backup values in case threshold fails
+    backup_min_error = float('inf')
+    backup_df = None
+    backup_opt_k = None
     
     # Setting progress bar--------------
     split_bar = tqdm(range(max_k-k))
@@ -317,6 +328,16 @@ def splitter(df,  # pandas dataFrame
                 print('Cluster splitted', c,'| Action causing contradiction:', a, '| Cluster most elements went to:', b)
             df_new, score = split(df_new, c, a, b, pfeatures, nc, classification,split_classifier_params)
             split_scores.append(score)
+            
+            # calculate incoherences
+            next_clus = next_clusters(df_new)
+            next_clus['incoherence'] = (1-next_clus['purity'])*next_clus['count']
+            next_clus.reset_index(inplace=True)
+            next_clus = next_clus.groupby('CLUSTER').sum()
+            max_inc = next_clus['incoherence'].max()
+            incoherences.append(max_inc)
+                
+            
             # error and accuracy calculations
             
             R2_train = R2_value_training(df_new)
@@ -356,10 +377,20 @@ def splitter(df,  # pandas dataFrame
             #print('predictions:', get_predictions(df_new))
             #print(df_new.head())
             
-            # update optimal dataframe
-            if train_error < min_error: 
+            # update optimal dataframe if inc threshold and min error met
+            threshold = eta*df_new.shape[0]**0.5/(nc+1)
+            thresholds.append(threshold)
+            print('threshold', threshold, 'max_inc', max_inc)
+            if max_inc < threshold and train_error < (min_error-precision_thresh): # take farthest along?
                 min_error = train_error
                 best_df = df_new.copy()
+                opt_k = nc+1
+                print('new opt_k', opt_k)
+                
+            elif opt_k == None and train_error < (backup_min_error-precision_thresh):
+                backup_min_error = train_error
+                backup_df = df_new.copy()
+                backup_opt_k = nc+1
             
             cont = True
             nc += 1
@@ -369,6 +400,8 @@ def splitter(df,  # pandas dataFrame
             print('Optimal # of clusters reached')
             break
         
+        
+            
         # plot every 20 iterations
         
         # if plot:
@@ -388,6 +421,11 @@ def splitter(df,  # pandas dataFrame
         #         plt.show()
         
         
+    # in the case that threshold prevents any values from passing, use backup
+    if opt_k == None: 
+        opt_k = backup_opt_k
+        best_df = backup_df
+        min_error = backup_min_error
             
     #if OutputFlag == 1:
         #print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
@@ -399,11 +437,11 @@ def splitter(df,  # pandas dataFrame
     if plot:
         if grid:
             fig1, ax1 = plt.subplots()
-            ax1.plot(its, training_R2, label= "Training R2")
+            #ax1.plot(its, training_R2, label= "Training R2")
             ax1.plot(its, training_acc, label = "Training Accuracy")
             if testing:
                 ax1.plot(its, testing_acc, label = "Testing Accuracy")
-                ax1.plot(its, testing_R2, label = "Testing R2")
+                #ax1.plot(its, testing_R2, label = "Testing R2")
             if n>0:
                 ax1.axvline(x=n,linestyle='--',color='r') #Plotting vertical line at #cluster =n
             ax1.set_ylim(0,1)
@@ -413,7 +451,10 @@ def splitter(df,  # pandas dataFrame
             ax1.legend()
         ## Plotting value error E((v_est - v_true)^2)
         fig2, ax2 = plt.subplots()
+        norm_max = max(incoherences)
         ax2.plot(its, training_error, label = "Training Error")
+        ax2.plot(its, np.array(incoherences)/norm_max, label = "Max Incoherence")
+        ax2.plot(its, np.array(thresholds)/norm_max, 'r-', label = "Threshold")
         if testing:
             ax2.plot(its, testing_error, label = "Testing Error")
         if n>0:
@@ -427,11 +468,13 @@ def splitter(df,  # pandas dataFrame
     
     df_train_error = pd.DataFrame(list(zip(its, training_error)), \
                                   columns = ['Clusters', 'Error'])
+    df_incoherences = pd.DataFrame(list(zip(its, incoherences)), \
+                                  columns = ['Clusters', 'Incoherences'])
     if testing:
         df_test_error = pd.DataFrame(list(zip(its, testing_error)), \
                                   columns = ['Clusters', 'Error'])
-        return (df_new,df_train_error,df_test_error, best_df, split_scores)
-    return(df_new,df_train_error,testing_error, best_df, split_scores)
+        return (df_new, df_incoherences, df_train_error,df_test_error, best_df, opt_k, split_scores)
+    return(df_new, df_incoherences, df_train_error,testing_error, best_df, opt_k, split_scores)
 
 #################################################################
 
@@ -443,6 +486,8 @@ def fit_CV(df,
           th,
           clustering,
           distance_threshold,
+          eta, 
+          precision_thresh,
           classification,
           split_classifier_params,
           max_k,
@@ -458,6 +503,7 @@ def fit_CV(df,
     
     df_training_error = pd.DataFrame(columns=['Clusters'])
     df_testing_error = pd.DataFrame(columns=['Clusters'])
+    df_incoherences = pd.DataFrame(columns=['Clusters'])
     
     gkf = GroupKFold(n_splits=cv)
     # shuffle the ID's (create a new column), and do splits based on new ID's
@@ -488,10 +534,12 @@ def fit_CV(df,
         #################################################################
         # Run Iterative Learning Algorithm
         
-        df_new,training_error,testing_error, best_df, split_scores = splitter(df_init,
+        df_new,incoherences,training_error,testing_error, best_df, opt_k, split_scores = splitter(df_init,
                                           pfeatures,
                                           th,
-                                          df_test,
+                                          eta = eta,
+                                          precision_thresh = precision_thresh,
+                                          df_test = df_test,
                                           testing = True,
                                           max_k = max_k,
                                           classification = classification,
@@ -506,17 +554,24 @@ def fit_CV(df,
                                                     how='outer', on=['Clusters'])
         df_testing_error = df_testing_error.merge(testing_error, \
                                                   how='outer', on=['Clusters'])
+        df_incoherences = df_incoherences.merge(incoherences, \
+                                                how='outer', on=['Clusters'])
     
     df_training_error.set_index('Clusters', inplace=True)
     df_testing_error.set_index('Clusters', inplace=True)
+    df_incoherences.set_index('Clusters', inplace=True)
     df_training_error.dropna(inplace=True)
     df_testing_error.dropna(inplace=True)
+    df_incoherences.dropna(inplace=True)
     #print(df_training_error)
     #print(df_testing_error)
     cv_training_error = np.mean(df_training_error, axis=1)
     cv_testing_error = np.mean(df_testing_error, axis=1)
+    cv_incoherences = np.mean(df_incoherences, axis=1)
+
     #print(cv_training_error)
     #print(cv_testing_error)
+    
     
     
     if plot:
@@ -535,4 +590,4 @@ def fit_CV(df,
         ax1.set_title('Mean CV Error and Accuracy During Splitting')
         ax1.legend()
     
-    return (cv_training_error,cv_testing_error, split_scores)
+    return (cv_incoherences, cv_training_error,cv_testing_error, split_scores)

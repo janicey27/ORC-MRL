@@ -31,6 +31,7 @@ class MDP_model:
         self.training_error = None # training errors after last split sequence
         self.split_scores = None # cv error from splitter
         self.opt_k = None # number of clusters in optimal clustering
+        self.eta = None # incoherence threshold
         self.df_trained = None # dataframe after optimal training
         self.m = None # model for predicting cluster number from features #CHANGE NAME
         self.clus_pred_accuracy = None # accuracy score of the cluster prediction function
@@ -57,6 +58,8 @@ class MDP_model:
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
             th=0, # splitting threshold
+            eta=0.2, # incoherence threshold
+            precision_thresh = 1e-14, # precision threshold
             classification = 'DecisionTreeClassifier', # classification method
             split_classifier_params = {'random_state': 0},
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
@@ -70,32 +73,46 @@ class MDP_model:
         # save relevant data
         self.df = df
         self.pfeatures = pfeatures
+        self.eta = eta
         
         # run cross validation on the data to find best clusters
-        cv_training_error,cv_testing_error, split_scores =fit_CV(self.df,
+        cv_incoherences, cv_training_error,cv_testing_error, split_scores =fit_CV(self.df,
                                                   self.pfeatures,
-                                                  th,
-                                                  clustering,
-                                                  distance_threshold,
-                                                  classification,
-                                                  split_classifier_params,
-                                                  max_k,
-                                                  n_clusters,
-                                                  random_state,
-                                                  h,
+                                                  th = th,
+                                                  clustering = clustering,
+                                                  distance_threshold = distance_threshold,
+                                                  eta = eta,
+                                                  precision_thresh = precision_thresh,
+                                                  classification = classification,
+                                                  split_classifier_params = split_classifier_params,
+                                                  max_k = max_k,
+                                                  n_clusters = n_clusters,
+                                                  random_state = random_state,
+                                                  h = h,
                                                   gamma = gamma, 
                                                   OutputFlag = OutputFlag,
                                                   cv=cv,
                                                   n=-1,
                                                   plot = plot)
         
-        # find the best cluster
-        k = cv_testing_error.idxmin()
-        print('best clusters:', k)
-        
-        # save total error and error corresponding to chosen model
-        self.CV_error = cv_testing_error.loc[k]
+        # find the best cluster by filtering by eta
+        cv_testing_error = pd.concat([cv_testing_error.rename('Error'), \
+                                      cv_incoherences.rename('Incoherence')], axis=1)# TODO: check for errors here
         self.CV_error_all = cv_testing_error
+        
+        cv_testing_error.reset_index(inplace=True)
+        
+        
+        print(cv_testing_error)
+        # find optimal cluster after filtering for eta
+        inc_thresh = self.eta*self.df.shape[0]**0.5
+        filtered = cv_testing_error.loc[cv_testing_error['Incoherence'] \
+                                        <inc_thresh/(cv_testing_error['Clusters'])]
+        print(filtered)
+        filtered.set_index('Clusters', inplace=True)
+        k = filtered['Error'].idxmin()
+
+        print('best clusters:', k)
         self.opt_k = k
         
         # actual training on all the data
@@ -108,9 +125,11 @@ class MDP_model:
         # change end state to 'end'
         df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
         
-        df_new,training_error,testing_error, best_df, split_scores = splitter(df_init,
+        df_new,df_incoherences,training_error,testing_error, best_df, opt_k, split_scores = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
+                                          eta=self.eta,
+                                          precision_thresh = precision_thresh,
                                           df_test = None,
                                           testing = False,
                                           max_k = self.opt_k,
@@ -130,6 +149,7 @@ class MDP_model:
         
         # store final training error
         self.training_error = training_value_error(self.df_trained)
+        self.incoherences = df_incoherences
         self.split_scores = split_scores
         
         
@@ -153,6 +173,8 @@ class MDP_model:
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
             cv=5, # number for cross validation
             th=0, # splitting threshold
+            eta=float('inf'), # incoherence threshold
+            precision_thresh = 1e-14, # precision threshold
             classification = 'DecisionTreeClassifier', # classification method
             split_classifier_params = {'random_state':0}, # dict of classifier params
             clustering='Agglomerative',# clustering method from Agglomerative, KMeans, and Birch
@@ -167,6 +189,9 @@ class MDP_model:
         # save relevant data
         self.df = df
         self.pfeatures = pfeatures
+        self.eta = eta
+        self.t_max = df['TIME'].max()
+        self.r_max = abs(df['RISK']).max()
         
         # training on all the data
         df_init = initializeClusters(self.df,
@@ -180,9 +205,11 @@ class MDP_model:
         print('Clusters Initialized')
         print(df_init)
         
-        df_new,training_error,testing_error, best_df, split_scores = splitter(df_init,
+        df_new,df_incoherences, training_error,testing_error, best_df, opt_k, split_scores = splitter(df_init,
                                           pfeatures=self.pfeatures,
                                           th=th,
+                                          eta=self.eta,
+                                          precision_thresh = precision_thresh,
                                           df_test = None,
                                           testing = False,
                                           max_k = max_k,
@@ -195,6 +222,7 @@ class MDP_model:
         
         # store all training errors
         self.training_error = training_error
+        self.incoherences = df_incoherences
         self.split_scores = split_scores
         
         # # if optimize, find best cluster and resplit
@@ -220,11 +248,12 @@ class MDP_model:
         #                                   OutputFlag = OutputFlag,
         #                                   plot = plot)
         
-        # storing trained dataset and predict_cluster function
+        # storing trained dataset and predict_cluster function.
+        # eta optimization is already done within splitter to find best_df and opt_k
         if optimize:
             self.df_trained = best_df
-            k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
-            self.opt_k = k
+            #k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
+            self.opt_k = opt_k
         else:
             self.df_trained = df_new
             self.opt_k = self.training_error['Clusters'].max()
@@ -299,14 +328,20 @@ class MDP_model:
     # and returns the the value and policy. 
     def solve_MDP(self,
                   alpha = 0.2, # statistical alpha threshold
-                  beta = 0.5, # statistical beta threshold
-                  min_action_obs = 5, # int: least number of actions that must be seen
+                  beta = 0.6, # statistical beta threshold
+                  min_action_obs = -1, # int: least number of actions that must be seen
                   min_action_purity = 0.3, # float: percentage purity above which is acceptable
                   prob='max', 
                   gamma=0.9, 
                   epsilon=10**(-10),
                   p=True):
         
+        # if default value, then scale the min threshold with data size, ratio 0.004
+        # TODO! FIX
+        if min_action_obs == -1:
+            min_action_obs = max(5, 0.008*self.df_trained.shape[0])
+            
+            
         # adding two clusters: one for reward sink, one for incorrectness sink
         # reward sink is R[s-2], incorrectness sink is R[s-1]
         
@@ -381,27 +416,31 @@ class MDP_model:
             c, u, t = row[1], row[2], row[3] #CLUSTER, ACTION, NEXT_CLUSTER
             P[u, c, t] = 1
         
-        # punishment node to itself:
+        # punishment node to 0 reward sink:
         for u in range(a):
-            P[u, -1, -1] = 1
+            P[u, -1, -2] = 1
         
         # append high negative reward for incorrect / impure transitions
         R = []
+        T_max = self.df_trained['TIME'].max()
+        r_max = abs(self.df_trained['RISK']).max()
+        self.t_max = T_max
+        self.r_max = r_max
         for i in range(a):
             if prob == 'max':
-                # instead of -100, take T-max * max reward * 10 ## store T_max and r_max from fit
-                R.append(np.append(np.array(self.R_df),-100))
+                # instead of -100, take T-max * max(abs(reward)) * 10 ## store T_max and r_max from fit
+                R.append(np.append(np.array(self.R_df),-self.t_max*self.r_max*2))
             else:
-                R.append(np.append(np.array(self.R_df),100))
+                R.append(np.append(np.array(self.R_df),self.t_max*self.r_max*2))
         R = np.array(R)
+        self.P = P
+        self.R = R
         
-        v, pi = SolveMDP(P, R, gamma, epsilon, p, prob)
+        v, pi = SolveMDP(P, R, gamma, epsilon, p, prob, threshold=self.t_max*self.r_max*3)
         
         # store values and policies and matrices
         self.v = v
         self.pi = pi
-        self.P = P
-        self.R = R
         
         return v, pi
     

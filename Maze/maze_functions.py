@@ -33,6 +33,7 @@ import gym_maze
 from sklearn.linear_model import LinearRegression, SGDRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+from sklearn.tree import DecisionTreeRegressor
 from tqdm import tqdm
 #################################################################
 
@@ -118,7 +119,7 @@ def createSamples(N, T_max, maze, r, reseed=False):
 def opt_model_trajectory(m, maze, alpha, min_action_obs=0, min_action_purity=0):
     #if m.v is None:
         #m.solve_MDP()
-    m.solve_MDP(alpha, min_action_obs, min_action_purity)
+    m.solve_MDP(alpha, min_action_obs, min_action_purity, gamma=1)
     env = gym.make(maze)
     obs = env.reset()
     l = env.maze_size[0]
@@ -241,7 +242,7 @@ def policy_trajectory(policy, maze, n=50, rand=True):
 # then returns the percentage correct from the model
 def policy_accuracy(m, maze, df):
     if m.v is None:
-        m.solve_MDP()
+        m.solve_MDP(gamma=1)
         
     # finding the true optimal: 
     P, R = get_maze_MDP(maze)
@@ -370,7 +371,8 @@ def get_maze_MDP(maze):
         # update rewards for new cluster
         if ogc not in c_seen:
             for i in range(a):
-                R[i, ogc] = reward
+                #R[i, ogc] = reward
+                R[i, ogc] = reward*10 # temporary change to get -0.04 reward
             c_seen.add(ogc)
         
         stop = False
@@ -512,16 +514,18 @@ def fitted_Q(K, # number of iterations
              gamma, # decay factor
              pfeatures, # number of features in dataframe
              actions, # list of action possibilities
-             f, # transition function 
              reward_c, # reward function
              take_max = True, # True if max_cost is good, otherwise false
-             regression = 'LinearRegression' # str: type of regression
+             regression = 'LinearRegression', # str: type of regression
+             one_hot = False, # one-hot encode the given actions
              ):
     
     x_df = x_df.copy(deep=True)
     #x_df = x_df.loc[x_df['']]
     # initialize storage and actions
     #Qs = []
+    values = []
+    num_actions = len(actions)
     
     # create the first Q1 function
     class Q:
@@ -531,22 +535,52 @@ def fitted_Q(K, # number of iterations
             return reward_c(x)
     Q_new = Q()
     #Qs.append(Q_new)
+
     
     # calculate the x_t2 next step for each x
-    x_df['x_t2'] = x_df.apply(lambda x: list(f(tuple(x[2:2+pfeatures]), x.ACTION, False)), \
-                                          axis=1)
+    x_df['x_t2'] = x_df.iloc[:, 2:2+pfeatures].values.tolist()
+    x_df['x_t2'] = x_df['x_t2'].shift(-1)
+    
+    
+    # delete the ones that don't finish
+    x_df.loc[(x_df['ID']!=x_df['ID'].shift(-1))&(x_df['ACTION']!='None'), 'ACTION'] = 'replace'
+    x_df = x_df[x_df['ACTION']!='replace']
+    
+    # deal with last x_t2 if it happens to finish, with empty list
+    x_df.loc[x_df['x_t2'].isnull(), ['x_t2']] = \
+        x_df.loc[x_df['x_t2'].isnull(), 'x_t2'].apply(lambda x: [])
+    
+    if one_hot:
+        actions_new = [[int(x==i) for x in range(num_actions)] for i in range(num_actions)]
         
+    else:
+        actions_new = [[a] for a in actions]
         
-    for i in range(len(actions)):
-        x_df['a%s'%i] = x_df.apply(lambda x: x.x_t2+[actions[i]], axis=1)
-    action_names = ['a%s'%i for i in range(len(actions))]
+    
+    for i in range(num_actions):
+        # regular action names
+        x_df['a%s'%i] = x_df.apply(lambda x: x.x_t2+actions_new[i], axis=1)
+        
+    action_names = ['a%s'%i for i in range(num_actions)]
     
     print(x_df, flush=True)
     # create X using x_t and u
     # select (x_t, u) pair as training
-    # setting 'None' action as action 4
-    X = x_df.iloc[:, 2:3+pfeatures]
-    X.loc[X['ACTION']=='None', 'ACTION'] = 4
+    # setting 'None' action as action -1
+    
+    if one_hot:
+        X = x_df.iloc[:, 2:2+pfeatures]
+        one_hot_actions = pd.get_dummies(x_df['ACTION'])[actions]
+        # represent 'None' as action 0 in the training data so it gets predicted
+        try:
+            one_hot_actions.loc[one_hot_actions['None']==1, 0] = 1
+        except:
+            pass
+        one_hot_actions = one_hot_actions[actions]
+        X = pd.concat([X, one_hot_actions], axis=1)
+    else:
+        X = x_df.iloc[:, 2:3+pfeatures]
+        X.loc[X['ACTION']=='None', 'ACTION'] = 0
     
     
     # maybe trying to put action as a tuple of (0, 1) or 1-hot to help it learn better...?
@@ -556,6 +590,22 @@ def fitted_Q(K, # number of iterations
     print('New training features', flush=True)
     print(X, flush=True)
     
+    # update function that returns the correct updated Q for the given row
+    # and the Q_new prediction function. Takes just the risk (with no extra update)
+    # for ending state, which is when ACTION = 'None'
+    def update(row, Q_new, take_max):
+        #print('action:', row.ACTION)
+        if row.ACTION == 'None':
+            #print('returning this')
+            return np.array([row.RISK])
+        if take_max:
+            return row.RISK + gamma*max([Q_new.predict([g]) \
+                                for g in [row[a] for a in action_names]])
+        else:
+            return row.RISK + gamma*min([Q_new.predict([g]) \
+                                for g in [row[a] for a in action_names]])
+            
+    
     
     bar = tqdm(range(K))
     #bar = range(K)
@@ -563,14 +613,15 @@ def fitted_Q(K, # number of iterations
     for i in bar:
         # create y using Qk-1 and x_t2
         # non-DP
+        '''
         if take_max: 
             y = x_df.apply(lambda x: x.RISK + gamma*max([Q_new.predict([g]) \
                                 for g in [x[a] for a in action_names]]), axis=1)
         else:
             y = x_df.apply(lambda x: x.RISK + gamma*min([Q_new.predict([g]) \
                                 for g in [x[a] for a in action_names]]), axis=1)
-        
-        
+        '''
+        y = x_df.apply(lambda x: update(x, Q_new, take_max), axis=1)
         
         '''                               
         # initialize dp
@@ -601,23 +652,34 @@ def fitted_Q(K, # number of iterations
         if regression ==  'LinearRegression':
             regr = LinearRegression().fit(X, y)
         if regression == 'RandomForest':
-            regr = RandomForestRegressor(max_depth=2, random_state=0).fit(X, y)
+            regr = RandomForestRegressor(random_state=0, oob_score=True).fit(X, y)
         if regression == 'ExtraTrees':
             regr = ExtraTreesRegressor(n_estimators=50).fit(X,y.ravel())
         if regression == 'SGDRegressor':
             regr = SGDRegressor().fit(X, y.ravel())
+        if regression == 'DecisionTrees':
+            regr = DecisionTreeRegressor(random_state=5).fit(X, y.ravel())
         #Qs.append(regr)
         Q_new = regr
         #print('memo size', len(memo), 'used', mu, flush=True)
+        
+        # calculate and store value of new policy
+        p = policy(actions_new, take_max)
+        p.fit(Q_new)
+        v = p.get_value([0.5, -0.5]) # get value of starting state
+        a = p.get_action([0.5, -0.5])
+        values.append(v)
+        
+        print('Iteration:', i, 'Start Value', v, 'action', a)
         
     
     #QK = Qs[-1]
     QK = Q_new
     
-    p = policy(actions, take_max)
+    p = policy(actions_new, take_max)
     p.fit(QK)
         
-    return QK, p, x_df
+    return QK, p, x_df, values
 
 
 class policy:
@@ -630,27 +692,50 @@ class policy:
             QK): # model, the latest fitted_Q 
         self.QK = QK
     
-    # pred() takes a state x and predicts the optimal action
+    # get_action() takes a state x and predicts the optimal action
     def get_action(self,
              x): 
         if self.take_max:
-            i = np.argmax([self.QK.predict([x + [u]]) \
+            i = np.argmax([self.QK.predict([x + u]) \
+                                        for u in self.actions])
+            #print([self.QK.predict([x + [u]]) \
+                                        #for u in self.actions])
+        else:
+            i = np.argmin([self.QK.predict([x + u]) \
+                                            for u in self.actions])
+        
+        if len(self.actions[i]) == 1:
+            return self.actions[i]
+        else: return np.argmax(self.actions[i])
+    
+    # TODO! Update to be compatible with np.arrays (use concat)
+    # get_value() takes a state x and returns the max value from fitted Q
+    def get_value(self, x):
+        if self.take_max:
+            val = max([self.QK.predict([x + u]) \
                                         for u in self.actions])
         else:
-            i = np.argmin([self.QK.predict([x + [u]]) \
-                                            for u in self.actions])
-        return self.actions[i]
-    
+            val = min([self.QK.predict([x + u]) \
+                                        for u in self.actions])
+        return val
+'''
+values = []
+for i in range(50):
+    x_model = np.array((random.random(), -random.random()))
+    v = p.get_value([x_model])
+    values.append(v)
+'''
     
 # value_diff() takes a list of models, and the real transitions calculates the difference between values
 # |v_policy/algo - v_opt*|. v_policy/algo is found by randomly generating K 
-# points in the starting cell, simulating over t_max steps, and taking the avg
+# points in the starting cell, simulating over t_max steps through the actual maze, and taking the avg
 # over these K trials. v_opt is the value taking the optimal policy
-def value_diff(models, Ns, K, t_max, P, R, f, r): 
+def value_diff(models, Ns, K, t_max, P, R, f, r, true_v = None, true_pi = None): 
     # first calculate v_opt for this particular maze and t_max steps
     v_opt = 0
     s = 0
-    true_v, true_pi = SolveMDP(P, R, prob='max')
+    if true_v is None or true_pi is None:
+        true_v, true_pi = SolveMDP(P, R, prob='max', gamma=1, epsilon=1e-8)
     for t in range(t_max):
         v_opt += R[0, s]
         #print(R[0, s], v_opt)
@@ -673,8 +758,9 @@ def value_diff(models, Ns, K, t_max, P, R, f, r):
         
         # calculating average value for this model and policy
         if m.pi is None:
-            print('resolved model')
-            m.solve_MDP()
+            #print('resolved model')
+            m.solve_MDP(gamma=1, epsilon=1e-4)
+        #m.solve_MDP(gamma=0.999)
         
         model_vs = []
         #policy_vs = []
@@ -717,7 +803,9 @@ def value_diff(models, Ns, K, t_max, P, R, f, r):
                 '''
             
             # append the total value from this trial
-            model_vs.append(vm_estim)
+            print(vm_estim, v_opt)
+            vm_diff = abs(vm_estim - v_opt)
+            model_vs.append(vm_diff)
             '''
             policy_vs.append(vp_estim)
             print('final model value', vm_estim)
@@ -734,16 +822,203 @@ def value_diff(models, Ns, K, t_max, P, R, f, r):
         #print('model avg for this trial', model_v)
         #print('policy avg for this trial', policy_v)
     
-    # calculate differences between values and optimal
-    v_alg_diff = abs(v_alg - v_opt) # np array minus value for all elements --
-                                    #TODO: Check these!!!
+
+
     #print('alg array', v_alg, 'v_opt', v_opt)
-    #print('difference array', v_alg_diff)
     '''
     v_policy_diff = abs(v_policy - v_opt)
     '''
     
-    return v_alg_diff
+    return v_alg
+
+
+def value_diff_policy(p, K, t_max, P, R, f, r, true_v = None, true_pi = None): 
+    # first calculate v_opt for this particular maze and t_max steps
+    v_opt = 0
+    s = 0
+    if true_v is None or true_pi is None:
+        true_v, true_pi = SolveMDP(P, R, prob='max', gamma=1, epsilon=1e-8)
+    for t in range(t_max):
+        v_opt += R[0, s]
+        #print(R[0, s], v_opt)
+        a = true_pi[s]
+        s_new = P[a, s].argmax()
+        s = s_new
+        #print(s)
+    
+    
+    policy_vs = []
+    
+    # initialize a list of random starting points (or not, since we won't be able to
+    # keep the rest of the transitions the same randomness anyway)
+    for k in range(K):
+        vp_estim = 0 # initializing policy value estimate
+        
+        x_policy = np.array((random.random(), -random.random()))
+        
+        # estimate value for model & policy
+        vp_estim += r(x_policy)
+        
+        for t in range(t_max):
+            # predict action and upate value for model
+        
+            
+            # predict action and update value for policy
+            if x_policy[0] == None:
+                u = 0
+            else:
+                u = p.get_action(list(x_policy))
+            x_policy_new = f(x_policy, u)
+            vp_estim += r(x_policy_new)
+            #print('new policy state', x_policy_new, 'reward', r(x_policy_new))
+            x_policy = x_policy_new
+
+        policy_vs.append(abs(vp_estim - v_opt))
+
+    # average values of all trials for this model/policy
+    
+    policy_v = np.mean(policy_vs)
+    
+    #print('model avg for this trial', model_v)
+    #print('policy avg for this trial', policy_v)
+    
+
+
+    #print('alg array', v_alg, 'v_opt', v_opt)
+    
+    
+    
+    return policy_v
+
+
+
+# value_est() takes a list of models, and compares the v_opt and v_alg for K 
+# number of random points from the same start cell. Result truncates everything 
+# greater than 1 to 1. 
+def value_est(models, Ns, K, P, R, f, r, true_v=None, true_pi=None):
+    # first calculate v_opt for this particular maze and t_max steps
+    v_opt = 0
+    s = 0
+    if true_v is None or true_pi is None:
+        true_v, true_pi = SolveMDP(P, R, prob='max', gamma=1, epsilon=1e-8)
+    print(true_v)
+    v_opt = true_v[0]
+    
+    # then for each model and policy, run through the K trials and return
+    # an array of differences corresponding to each N 
+    n = len(Ns)
+    
+    v_alg = []
+    # for each n of this set:
+    for i in range(n):
+        print('Round N=', Ns[i])
+        m = models[i]
+        
+        # calculating average value for this model and policy
+        if m.pi is None:
+            #print('resolved model')
+            m.solve_MDP(gamma=1, epsilon=1e-4)
+        #m.solve_MDP(gamma=1)
+        
+        model_vs = []
+        for k in range(K):
+            start = np.array((random.random(), -random.random()))
+            s = m.m.predict(start.reshape(1, -1))
+            val = m.v[s]
+            #print('val', val, 'v_opt', v_opt, 's', s)
+            v_diff = abs(val - v_opt)
+            val_trunc = min([1], v_diff) # truncate and take 1 as highest
+            #print(val_trunc)
+            model_vs.append(val_trunc)
+        
+        model_v = np.mean(model_vs)
+        print('model avg val', model_v)
+        v_alg.append(model_v)
+    
+    # calculate differences between values and optimal
+    #v_alg_diff = abs(v_alg - v_opt)
+    return v_alg
+
+
+# opt_path_value_diff() compares the v_opt from the optimal sequence of actions
+# to the value derived from the MDP also taking this exact sequence of actions
+# averaged over K trials. Result truncates anything greater than 1 to 1. 
+def opt_path_value_diff(models, Ns, K, t_max, P, R, f, r, true_v = None, true_pi = None): 
+    # first calculate v_opt for this particular maze and t_max steps
+    v_opt = 0
+    s = 0
+    actions = []
+    if true_v is None or true_pi is None:
+        true_v, true_pi = SolveMDP(P, R, prob='max', gamma=1, epsilon=1e-8)
+    for t in range(t_max):
+        v_opt += R[0, s]
+        #print(R[0, s], v_opt)
+        a = true_pi[s]
+        actions.append(a)
+        s_new = P[a, s].argmax()
+        s = s_new
+        #print(s)
+    
+    # then for each model and policy, run through the K trials and return
+    # an array of differences corresponding to each N 
+    n = len(Ns)
+    
+    v_alg = []
+    #v_policy = []
+    # for each n of this set:
+    for i in range(n):
+        print('Round N=', Ns[i])
+        m = models[i]
+        #p = policies[i]
+        
+        # calculating average value for this model and policy
+        if m.pi is None:
+            #print('resolved model')
+            m.solve_MDP(gamma=1, epsilon=1e-4)
+        #m.solve_MDP(gamma=0.999)
+        
+        model_vs = []
+        #policy_vs = []
+      
+        # initialize a list of random starting points (or not, since we won't be able to
+        # keep the rest of the transitions the same randomness anyway)
+        for k in range(K):
+            vm_estim = 0 # initializing model value estimate
+            
+            start = np.array((random.random(), -random.random()))
+            
+            # estimate value for model 
+            s = m.m.predict(start.reshape(1, -1))
+            #s_prime = s
+            vm_estim += m.R[0, s]
+            
+            # take the list of actions through MDP and update value
+            for a in actions:
+                s = m.P[a,s].argmax()
+                
+                vm_estim += m.R[0, s]
+                
+            
+            # append the total value from this trial
+            
+            vm_diff = abs(vm_estim - v_opt)
+            val_trunc = min([1], vm_diff)
+            #if val_trunc[0]> 0.2:
+                #print(s_prime)
+                #print(vm_estim, v_opt)
+            model_vs.append(val_trunc)
+            
+        
+        # average values of all trials for this model/policy
+        model_v = np.mean(model_vs)
+        v_alg.append(model_v)
+        
+        #print('model avg for this trial', model_v)
+        #print('policy avg for this trial', policy_v)
+
+    
+    return v_alg
+    
         
 # Initialize the "maze" environment
 # =============================================================================
@@ -772,3 +1047,10 @@ def value_diff(models, Ns, K, t_max, P, R, f, r):
 # =============================================================================
 
 # =============================================================================
+# Load models
+# s = 5
+# Ns = [10, 20, 30, 40, 50, 70, 90, 110, 130, 150, 170, 200]
+# models = []
+# for n in Ns:
+#     m = pickle.load(open(f'round_{s}_model_N={n}.sav', 'rb'))
+#     models.append(m)

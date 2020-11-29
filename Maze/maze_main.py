@@ -23,7 +23,7 @@ from testing import cluster_size, next_clusters, training_value_error, purity
 #################################################################
 
 # Set Parameters
-N = 150
+N = 200
 T_max = 25
 max_k = 25
 clustering = 'Agglomerative'
@@ -35,6 +35,7 @@ actions = [0, 1, 2, 3]
 h = -1
 cv = 5
 th = 0
+eta = 6
 gamma = 1
 classification = 'DecisionTreeClassifier'
 #classification = 'RandomForestClassifier'
@@ -58,31 +59,35 @@ mazes = {1: 'maze-v0',
          11: 'maze-random-20x20-plus-v0', # has portals 
          12: 'maze-random-30x30-plus-v0'} # has portals 
 
-df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
-#df.to_csv('set_43.csv')
+
+#df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
+#df.to_csv(f'set_{i}.csv')
 #print(df)
 
 #################################################################
 # Run Algorithm
-
-m = MDP_model()
-m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
-    pfeatures, # int: number of features
-    h, # int: time horizon (# of actions we want to optimize)
-    gamma, # discount factor
-    max_k, # int: number of iterations
-    distance_threshold, # clustering diameter for Agglomerative clustering
-    cv, # number for cross validation
-    th, # splitting threshold
-    classification, # classification method
-    split_classifier_params, # classification params
-    clustering,# clustering method from Agglomerative, KMeans, and Birch
-    n_clusters, # number of clusters for KMeans
-    random_state,
-    plot=True,
-    optimize=True)
-
-
+# =============================================================================
+# 
+# m = MDP_model()
+# m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+#     pfeatures, # int: number of features
+#     h, # int: time horizon (# of actions we want to optimize)
+#     gamma, # discount factor
+#     max_k, # int: number of iterations
+#     distance_threshold, # clustering diameter for Agglomerative clustering
+#     cv, # number for cross validation
+#     th, # splitting threshold
+#     eta, # incoherence thresholds
+#     classification, # classification method
+#     split_classifier_params, # classification params
+#     clustering,# clustering method from Agglomerative, KMeans, and Birch
+#     n_clusters, # number of clusters for KMeans
+#     random_state,
+#     plot=True,
+#     optimize=True)
+# 
+# 
+# =============================================================================
 #################################################################
 # Loading csv
 '''
@@ -105,7 +110,22 @@ pickle.dump(p, open('fitted_Q_policy_N=170.sav', 'wb'))
 
 # Generate a lot of csvs: 
 '''
-for i in range(33, 50):
+for i in range(150, 200):
     df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
     df.to_csv(f'set_{i}.csv')
+'''
+
+# Update df rewards to -0.04 for all RISK
+'''
+for i in range(150, 200):
+    filename = f'set_{i}.csv'
+    df = pd.read_csv(filename)
+    
+    df = df.iloc[:, 1:]
+    df.loc[df['ACTION']=='None', 'ACTION'] = 4
+    df['ACTION'] = pd.to_numeric(df['ACTION'], downcast='integer')
+    df.loc[df['ACTION']==4, 'ACTION'] = 'None'
+    
+    df.loc[df['RISK']==-0.004, 'RISK'] = -0.04
+    df.to_csv(filename)
 '''

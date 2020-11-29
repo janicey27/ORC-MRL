@@ -173,7 +173,8 @@ def training_value_error(df_new, #Outpul of algorithm
             # error raises in case we never saw a given transition in the data
             #except ValueError
             except:
-                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+                pass
+                #print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
            
             t += 1
             a = df_new['ACTION'].loc[index + t]
@@ -249,7 +250,8 @@ def testing_value_error(df_test,
             
             #except TypeError: # sometimes we see KeyError or IndexError...
             except:
-                print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+                pass
+                #print('WARNING: In training value evaluation, trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             
             
             t += 1
@@ -304,7 +306,8 @@ def R2_value_training(df_new):
             # error raises in case we never saw a given transition in the data
             #except TypeError:
             except:
-                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+                pass
+                #print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_new['ACTION'].loc[index + t]
             v_estim = v_estim + R_df.loc[s]
             
@@ -353,7 +356,8 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
             # error raises in case we never saw a given transition in the data
             #except TypeError:
             except:
-                print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
+                pass
+                #print('WARNING: Trying to predict next state from state',s,'taking action',a,', but this transition is never seen in the data. Data point:',i,t)
             a = df_test['ACTION'].loc[index + t]
 
             v_estim = v_estim + R_df.loc[s]
@@ -380,10 +384,9 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
 # plot_features() takes in a dataframe and two features, and plots the data
 # to illustrate the noise in each cluster
 def plot_features(df, x, y, c='CLUSTER'):
-    ax = df.plot.scatter(x=x,
-                      y=y,
-                      c=c,
-                      colormap='tab20')
+    fig, ax = plt.subplots()
+    df.plot(kind="scatter", x=x, y=y, c=c, cmap='tab20', ax=ax)
+
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
     ax.set_xlabel(x)
@@ -577,12 +580,12 @@ def training_accuracy(df_new):
 # also returns a dataframe that has testing accuracies for each OG_CLUSTER
 def testing_accuracy(df_test, # dataframe: testing data
                      df_new, # dataframe: clustered on training data
-                     model, # function: output of predict_cluster
+                     model, # function: output of predict_cluster, mdp.m
                      pfeatures): # int: # of features
     
     clusters = get_predictions(df_new)
     
-    test_clusters = model.m.predict(df_test.iloc[:, 2:2+pfeatures])
+    test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
     df_test['CLUSTER'] = test_clusters
     
     accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] \
@@ -613,7 +616,7 @@ def generalization_accuracy(models, df_test, Ns):
         tr_acc, df = training_accuracy(model.df_trained)
         tr_accs.append(tr_acc)
         
-        test_acc, df_t = testing_accuracy(df_test, model.df_trained, model, model.pfeatures)
+        test_acc, df_t = testing_accuracy(df_test, model.df_trained, model.m, model.pfeatures)
         test_accs.append(test_acc)
     
     fig1, ax1 = plt.subplots()
