@@ -27,7 +27,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import GroupKFold
 #from xgboost import XGBClassifier
-from sklearn.model_selection import GridSearchCV
+#from sklearn.model_selection import GridSearchCV
 from collections import Counter
 from itertools import groupby
 from operator import itemgetter
@@ -156,7 +156,8 @@ def multimode(data):
 # cluster that is a contradiction c, a time horizon T, then number of features,
 # and an iterator k (that is the indexer of the next cluster), as well as the
 # predictive classification algorithm used
-# and returns a new dataframe with the contradiction resolved
+# Returns a new dataframe with the contradiction resolved, and the best fit score
+# for the splitting model (if GridSearch used)
 def split(df,  # pandas dataFrame
           i,  # integer: initial cluster
           a,  # integer: action taken
@@ -234,13 +235,6 @@ def split(df,  # pandas dataFrame
         id2 = g3.loc[g3["GROUP"] == 1].index.values
         ids = np.concatenate((ids, id2))
     
-
-    '''
-    df.loc[df.index.isin(ids), 'CLUSTER'] = k
-    newids = ids-1
-    newids = np.where((newids%T) != (T-1), newids, -1)
-    df.loc[df.index.isin(newids), 'NEXT_CLUSTER'] = k
-    '''
     
     df.loc[df.index.isin(ids), 'CLUSTER'] = k
     newids = ids-1
@@ -250,16 +244,16 @@ def split(df,  # pandas dataFrame
     return df, score
 
 
-# splitter() is the wrap-up function. Takes as parameters a dataframe df,
-# a time-horizon T, a number of features pfeatures, an indexer k, and a max
-# number of iterations and performs the algorithm until all contradictions are
+# splitter() is the wrap-up function. Takes the below parameters and
+# performs the algorithm until all contradictions are
 # resolved or until the max number of iterations is reached
 # Plots the trajectory of testing metrics during splitting process
-# Returns the final resulting dataframe
+# Returns the final resulting dataframe, as well as incoherences, errors,
+# and the dataframe with the optimal split
 def splitter(df,  # pandas dataFrame
              pfeatures,  # integer: number of features
              th, # integer: threshold for minimum split
-             eta = 0.5, # incoherence threshold for splits 
+             eta = 25, # incoherence threshold for splits 
              precision_thresh = 1e-14, # precision threshold when considering new min value error
              df_test = None, # df_test provided for cross validation
              testing = False, # True if we are cross validating
@@ -268,7 +262,7 @@ def splitter(df,  # pandas dataFrame
              split_classifier_params = {'random_state':0}, # dict: classification params
              h=5,
              gamma=1,
-             OutputFlag = 1,
+             verbose = False,
              n=-1,
              plot = False):  
     # initializing lists for error & accuracy data
@@ -288,9 +282,7 @@ def splitter(df,  # pandas dataFrame
         grid = True
     else:
         grid = False
-    # TODO: check why testing_acc throws an error here
-    #TEMPORARY CHANGE: 
-    #grid = False
+
     
     k = df['CLUSTER'].nunique() #initial number of clusters 
     nc = k #number of clusters
@@ -316,15 +308,11 @@ def splitter(df,  # pandas dataFrame
         cont = False
         c, a = findContradiction(df_new, th)
         if c != -1:
-            #if OutputFlag == 1:
-                #print('Cluster Content')
-                #print(df_new.groupby(
-                            #'CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
             
             # finding contradictions and splitting
             a, b = contradiction(df_new, c, a)
             
-            if OutputFlag == 1:
+            if verbose:
                 print('Cluster splitted', c,'| Action causing contradiction:', a, '| Cluster most elements went to:', b)
             df_new, score = split(df_new, c, a, b, pfeatures, nc, classification,split_classifier_params)
             split_scores.append(score)
@@ -364,7 +352,7 @@ def splitter(df,  # pandas dataFrame
                 
             
             # printing error and accuracy values
-            if OutputFlag == 1:
+            if verbose:
                 print('training value R2:', R2_train)
                 print('training value error:', train_error)
                 if grid:
@@ -380,12 +368,14 @@ def splitter(df,  # pandas dataFrame
             # update optimal dataframe if inc threshold and min error met
             threshold = eta*df_new.shape[0]**0.5/(nc+1)
             thresholds.append(threshold)
-            print('threshold', threshold, 'max_inc', max_inc)
-            if max_inc < threshold and train_error < (min_error-precision_thresh): # take farthest along?
+            if verbose:
+                print('threshold:', threshold, 'max_incoherence:', max_inc)
+            if max_inc < threshold and train_error < (min_error-precision_thresh): # take first in plateau
                 min_error = train_error
                 best_df = df_new.copy()
                 opt_k = nc+1
-                print('new opt_k', opt_k)
+                if verbose:
+                    print('new opt_k', opt_k)
                 
             elif opt_k == None and train_error < (backup_min_error-precision_thresh):
                 backup_min_error = train_error
@@ -397,11 +387,11 @@ def splitter(df,  # pandas dataFrame
         if not cont:
             break
         if nc >= max_k:
-            print('Optimal # of clusters reached')
+            if verbose:
+                print('Optimal # of clusters reached')
             break
         
         
-            
         # plot every 20 iterations
         
         # if plot:
@@ -427,9 +417,6 @@ def splitter(df,  # pandas dataFrame
         best_df = backup_df
         min_error = backup_min_error
             
-    #if OutputFlag == 1:
-        #print(df_new.groupby(['CLUSTER', 'OG_CLUSTER'])['ACTION'].count())
-    
     
     # plotting functions
     ## Plotting accuracy and value R2
@@ -480,7 +467,9 @@ def splitter(df,  # pandas dataFrame
 
 
 
-# Splitter algorithm with cross-validation
+# Splitter algorithm with Group K-fold cross-validation (number of folds from param cv)
+# Returns dataframes of incoherences, errors, and splitter split-scores, where
+# the optimal clustering can later be determined. 
 def fit_CV(df,
           pfeatures,
           th,
@@ -495,7 +484,7 @@ def fit_CV(df,
           random_state,
           h,
           gamma=1,
-          OutputFlag = 0,
+          verbose = False,
           cv=5,
           n=-1,
           plot = False):
@@ -526,7 +515,7 @@ def fit_CV(df,
                                 n_clusters=n_clusters,
                                 distance_threshold = distance_threshold,
                                 random_state=random_state)
-        k = df_init['CLUSTER'].nunique()
+        #k = df_init['CLUSTER'].nunique()
         #print('k', k)
         #print(df_init)
         #################################################################
@@ -546,7 +535,7 @@ def fit_CV(df,
                                           split_classifier_params = split_classifier_params,
                                           h = h, 
                                           gamma = gamma,
-                                          OutputFlag = 0,
+                                          verbose = False,
                                           n=n,
                                           plot = plot)
         

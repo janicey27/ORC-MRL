@@ -385,7 +385,7 @@ def R2_value_testing(df_test, df_new, model, pfeatures):
 # to illustrate the noise in each cluster
 def plot_features(df, x, y, c='CLUSTER'):
     fig, ax = plt.subplots()
-    df.plot(kind="scatter", x=x, y=y, c=c, cmap='tab20', ax=ax)
+    df.plot(kind="scatter", x=x, y=y, c=c, cmap='tab20', ax=ax, s=5)
 
 #    import seaborn as sns
 #    sns.pairplot(x_vars=["FEATURE_1"], y_vars=["FEATURE_2"], data=df, hue="OG_CLUSTER", height=5)
@@ -472,7 +472,6 @@ def decision_tree_regions(model):
     plt.show()
     return
 
-# NOT TESTED YET! TEST ON HIV WHEN MODEL TRAINED!
 # model_trajectory() takes a trained model, the real transition function of
 # the model f(x, u), the initial state x, and plots how the model's optimal 
 # policy looks like on the start state according to f1 and f2 two features 
@@ -536,6 +535,28 @@ def model_trajectory(m,
     #plt.xlim(-.5, l-0.5)
     plt.show()
     return xs, ys, all_vecs
+
+
+# plot_CV_training() takes a model trained by cross validation, and plots the
+# testing error, training, error, and incoherence on the same graph 
+def plot_CV_training(model):
+    fig, ax1 = plt.subplots()
+
+    ax1.set_xlabel('K meta-state space size')
+    ax1.set_ylabel('Score')
+    ax1.plot(model.CV_error_all['Training Error'], label = 'In-Sample')
+    ax1.plot(model.CV_error_all['Testing Error'], label = 'Testing')
+    
+    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    
+    color = 'tab:red'
+    ax2.set_ylabel('Number of Incoherences')  # we already handled the x-label with ax1
+    ax2.plot(model.CV_error_all['Incoherence'], color = color, label = 'Incoherences')
+    
+    fig.legend()
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+    plt.show()
+    
     
 #################################################################
 

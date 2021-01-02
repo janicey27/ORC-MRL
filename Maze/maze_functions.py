@@ -101,7 +101,8 @@ def createSamples(N, T_max, maze, r, reseed=False):
                 transitions.append([i, t+1, new_obs+offset, 'None', reward, ogc])
                 break
             x = new_obs + offset
-            
+    
+    env.close()
     
     df = pd.DataFrame(transitions, columns=['ID', 'TIME', 'x', 'ACTION', 'RISK', 'OG_CLUSTER'])
                       
@@ -146,7 +147,9 @@ def opt_model_trajectory(m, maze, alpha, min_action_obs=0, min_action_purity=0):
         #print(done)
         xs.append(obs[0])
         ys.append(-obs[1])
-
+    
+    env.close()
+    
     xs = np.array(xs)
     ys = np.array(ys)
     
@@ -210,6 +213,8 @@ def policy_trajectory(policy, maze, n=50, rand=True):
         i += 1
         if i == n:
             done = True
+    
+    env.close()
     
     xs = np.array(xs)
     ys = np.array(ys)
@@ -314,7 +319,9 @@ def opt_maze_trajectory(maze):
         #print(done)
         xs.append(obs[0])
         ys.append(-obs[1])
-
+        
+    env.close()
+    
     xs = np.array(xs)
     ys = np.array(ys)
     
@@ -417,7 +424,8 @@ def get_maze_MDP(maze):
             if done:
                 obs = env.reset()
                 ogc = int(obs[0] + obs[1]*l)
-
+    env.close()
+    
     return P, R
 
 
@@ -832,6 +840,10 @@ def value_diff(models, Ns, K, t_max, P, R, f, r, true_v = None, true_pi = None):
     return v_alg
 
 
+# value_diff_policy() takes a policy, and calculates the optimality gap of this
+# policy (same as value_diff above). 
+# TODO: Update so it works for a list of policies and Ns, in the same format as above
+# by adding a toggle for model = False / True
 def value_diff_policy(p, K, t_max, P, R, f, r, true_v = None, true_pi = None): 
     # first calculate v_opt for this particular maze and t_max steps
     v_opt = 0
@@ -895,6 +907,7 @@ def value_diff_policy(p, K, t_max, P, R, f, r, true_v = None, true_pi = None):
 # value_est() takes a list of models, and compares the v_opt and v_alg for K 
 # number of random points from the same start cell. Result truncates everything 
 # greater than 1 to 1. 
+# TODO! Add toggle for policies
 def value_est(models, Ns, K, P, R, f, r, true_v=None, true_pi=None):
     # first calculate v_opt for this particular maze and t_max steps
     v_opt = 0
@@ -940,9 +953,11 @@ def value_est(models, Ns, K, P, R, f, r, true_v=None, true_pi=None):
     return v_alg
 
 
+
 # opt_path_value_diff() compares the v_opt from the optimal sequence of actions
 # to the value derived from the MDP also taking this exact sequence of actions
 # averaged over K trials. Result truncates anything greater than 1 to 1. 
+# TODO! Add toggle for policies
 def opt_path_value_diff(models, Ns, K, t_max, P, R, f, r, true_v = None, true_pi = None): 
     # first calculate v_opt for this particular maze and t_max steps
     v_opt = 0
@@ -1019,6 +1034,7 @@ def opt_path_value_diff(models, Ns, K, t_max, P, R, f, r, true_v = None, true_pi
     
     return v_alg
     
+
         
 # Initialize the "maze" environment
 # =============================================================================

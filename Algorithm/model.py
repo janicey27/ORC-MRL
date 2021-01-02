@@ -3,7 +3,7 @@
 """
 Created on Mon May 25 19:47:03 2020
 
-Model Class that runs the Iterative Clustering algorithm on any data.  
+Model Class that runs the MRL algorithm on any data.  
 
 @author: janiceyang
 """
@@ -29,7 +29,7 @@ class MDP_model:
         self.CV_error = None # error at minimum point of CV
         self.CV_error_all = None # errors of different clusters after CV
         self.training_error = None # training errors after last split sequence
-        self.split_scores = None # cv error from splitter
+        self.split_scores = None # cv error from splitter (if GridSearch used)
         self.opt_k = None # number of clusters in optimal clustering
         self.eta = None # incoherence threshold
         self.df_trained = None # dataframe after optimal training
@@ -56,9 +56,9 @@ class MDP_model:
             gamma=1, # discount value
             max_k=70, # int: max number of clusters
             distance_threshold = 0.05, # clustering diameter for Agglomerative clustering
-            cv=5, # number for cross validation
+            cv=5, # number of folds for cross validation
             th=0, # splitting threshold
-            eta=0.2, # incoherence threshold
+            eta=float('inf'), # incoherence threshold, calculated by eta*sqrt(datapoints)/clusters
             precision_thresh = 1e-14, # precision threshold
             classification = 'DecisionTreeClassifier', # classification method
             split_classifier_params = {'random_state': 0},
@@ -66,7 +66,7 @@ class MDP_model:
             n_clusters = None, # number of clusters for KMeans
             random_state = 0,
             plot = False,
-            OutputFlag = 0):
+            verbose = False):
         
         df = data.copy()
             
@@ -90,29 +90,33 @@ class MDP_model:
                                                   random_state = random_state,
                                                   h = h,
                                                   gamma = gamma, 
-                                                  OutputFlag = OutputFlag,
+                                                  verbose = verbose,
                                                   cv=cv,
                                                   n=-1,
                                                   plot = plot)
         
         # find the best cluster by filtering by eta
-        cv_testing_error = pd.concat([cv_testing_error.rename('Error'), \
-                                      cv_incoherences.rename('Incoherence')], axis=1)# TODO: check for errors here
+        cv_testing_error = pd.concat([cv_testing_error.rename('Testing Error'), \
+                                      cv_training_error.rename('Training Error'), \
+                                      cv_incoherences.rename('Incoherence')], axis=1)
         self.CV_error_all = cv_testing_error
         
         cv_testing_error.reset_index(inplace=True)
         
         
-        print(cv_testing_error)
+        
         # find optimal cluster after filtering for eta
         inc_thresh = self.eta*self.df.shape[0]**0.5
         filtered = cv_testing_error.loc[cv_testing_error['Incoherence'] \
                                         <inc_thresh/(cv_testing_error['Clusters'])]
-        print(filtered)
+    
         filtered.set_index('Clusters', inplace=True)
-        k = filtered['Error'].idxmin()
-
-        print('best clusters:', k)
+        k = filtered['Testing Error'].idxmin()
+        
+        if verbose:
+            print('CV Testing Error')
+            print(cv_testing_error)
+            print('best clusters:', k)
         self.opt_k = k
         
         # actual training on all the data
@@ -137,7 +141,7 @@ class MDP_model:
                                           split_classifier_params = split_classifier_params,
                                           h=h,
                                           gamma=gamma,
-                                          OutputFlag = OutputFlag,
+                                          verbose = verbose,
                                           plot = plot)
         
         
@@ -182,7 +186,7 @@ class MDP_model:
             random_state = 0,
             plot = False,
             optimize = True,
-            OutputFlag = 0):
+            verbose = False):
     
         df = data.copy()
             
@@ -203,7 +207,8 @@ class MDP_model:
         # change end state to 'end'
         df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
         print('Clusters Initialized')
-        print(df_init)
+        if verbose:
+            print(df_init)
         
         df_new,df_incoherences, training_error,testing_error, best_df, opt_k, split_scores = splitter(df_init,
                                           pfeatures=self.pfeatures,
@@ -217,7 +222,7 @@ class MDP_model:
                                           split_classifier_params = split_classifier_params,
                                           h=h,
                                           gamma=gamma,
-                                          OutputFlag = OutputFlag,
+                                          verbose = verbose,
                                           plot = plot)
         
         # store all training errors
@@ -225,28 +230,6 @@ class MDP_model:
         self.incoherences = df_incoherences
         self.split_scores = split_scores
         
-        # # if optimize, find best cluster and resplit
-        # if optimize: 
-        #     k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
-        #     for i in range(k):
-        #         # if clustering is less than k but error within 10^-14, take this
-        #         if abs(self.training_error['Error'].min() - \
-        #                self.training_error.loc[self.training_error['Clusters']==i]['Error'].min()) < 1e-14:
-        #             k = i
-        #             break
-        #     self.opt_k = k
-        #     df_new,training_error,testing_error = splitter(df_init,
-        #                                   pfeatures=self.pfeatures,
-        #                                   th=th,
-        #                                   df_test = None,
-        #                                   testing = False,
-        #                                   max_k = self.opt_k,
-        #                                   classification=classification,
-        #                                   split_classifier_params = split_classifier_params,
-        #                                   h=h,
-        #                                   gamma=gamma,
-        #                                   OutputFlag = OutputFlag,
-        #                                   plot = plot)
         
         # storing trained dataset and predict_cluster function.
         # eta optimization is already done within splitter to find best_df and opt_k
@@ -325,25 +308,27 @@ class MDP_model:
     # and the threshold cutoffs to not include actions that don't appear enough
     # in each state, as well as purity cutoff for next_states that do not 
     # represent enough percentage of all the potential next_states 
-    # and returns the the value and policy. 
+    # and returns the the value and policy. When solving the MDP, creates an 
+    # artificial punishment state that is reached for state/action pairs that 
+    # don't meet the above cutoffs; also creates a sink node of reward 0 
+    # after the goal state or punishment state is reached. 
     def solve_MDP(self,
                   alpha = 0.2, # statistical alpha threshold
                   beta = 0.6, # statistical beta threshold
                   min_action_obs = -1, # int: least number of actions that must be seen
                   min_action_purity = 0.3, # float: percentage purity above which is acceptable
-                  prob='max', 
-                  gamma=0.9, 
+                  prob='max', # str: 'max', or 'min' for maximization or minimization problem
+                  gamma=0.9, # discount factor
                   epsilon=10**(-10),
                   p=True):
         
-        # if default value, then scale the min threshold with data size, ratio 0.004
-        # TODO! FIX
+        # if default value, then scale the min threshold with data size, ratio 0.008
         if min_action_obs == -1:
             min_action_obs = max(5, 0.008*self.df_trained.shape[0])
             
             
-        # adding two clusters: one for reward sink, one for incorrectness sink
-        # reward sink is R[s-2], incorrectness sink is R[s-1]
+        # adding two clusters: one for sink node (reward = 0), one for punishment state
+        # sink node is R[s-2], punishment state is R[s-1]
         
         P_df = self.P_df.copy()
         P_df['count'] = self.nc['count']
@@ -353,20 +338,12 @@ class MDP_model:
         # record parameters of transition dataframe
         a = P_df['ACTION'].nunique()
         s = P_df['CLUSTER'].nunique()
-        n = P_df['NEXT_CLUSTER'].nunique()
         actions = P_df['ACTION'].unique()
         
-        # convert ACTION, CLUSTER, and NEXT_CLUSTER to integers
         
-        
-        #print(P_df)
         # Take out rows that don't pass statistical alpha test
         P_alph = P_df.loc[(1-binom.cdf(P_df['purity']*(P_df['count']), P_df['count'],\
                                       beta))<=alpha]
-        
-        # for old version of self.nc:
-        #P_alph = P_df.loc[(1-binom.cdf(P_df['count'], P_df['count']/P_df['purity'],\
-                                      #0.5))<=alpha]
         
         # Take out rows where actions or purity below threshold
         P_thresh = P_alph.loc[(P_alph['count']>min_action_obs)&(P_alph['purity']>min_action_purity)]
@@ -379,11 +356,7 @@ class MDP_model:
             for u in not_present:
                 missing_pairs.append((c, u))
         
-        #print(P_opt)
-        
-        # FIX to make sure there are no indexing errors - not big enough matrix defined?
         P = np.zeros((a, s+1, s+1))
-        
         
         # model transitions
         for row in P_thresh.itertuples():
@@ -398,7 +371,6 @@ class MDP_model:
             P[u, c, -1] = 1
             
         # reinsert transition for cluster/action pairs taken out by threshold
-        # ALSO INCLUDE NOT SEEN??
         excl = P_df.loc[(P_df['count']<=min_action_obs)|(P_df['purity']<=min_action_purity)]
         for row in excl.itertuples():
             c, u = row[1], row[2] #CLUSTER, ACTION
@@ -416,19 +388,21 @@ class MDP_model:
             c, u, t = row[1], row[2], row[3] #CLUSTER, ACTION, NEXT_CLUSTER
             P[u, c, t] = 1
         
-        # punishment node to 0 reward sink:
-        for u in range(a):
-            P[u, -1, -2] = 1
+        # punishment node to 0 reward sink (if sink was created in get_MDP):
+        if 'End' in self.df_trained['NEXT_CLUSTER'].unique():
+            for u in range(a):
+                P[u, -1, -2] = 1
         
         # append high negative reward for incorrect / impure transitions
         R = []
+        
         T_max = self.df_trained['TIME'].max()
         r_max = abs(self.df_trained['RISK']).max()
         self.t_max = T_max
         self.r_max = r_max
         for i in range(a):
             if prob == 'max':
-                # instead of -100, take T-max * max(abs(reward)) * 10 ## store T_max and r_max from fit
+                # take T-max * max(abs(reward)) * 2 
                 R.append(np.append(np.array(self.R_df),-self.t_max*self.r_max*2))
             else:
                 R.append(np.append(np.array(self.R_df),self.t_max*self.r_max*2))
@@ -436,6 +410,8 @@ class MDP_model:
         self.P = P
         self.R = R
         
+        # solve the MDP, with an extra threshold to guarantee value iteration
+        # ends if gamma=1
         v, pi = SolveMDP(P, R, gamma, epsilon, p, prob, threshold=self.t_max*self.r_max*3)
         
         # store values and policies and matrices
@@ -455,14 +431,7 @@ class MDP_model:
                              n=30): # points to be plotted
     
         xs, ys, all_vecs = model_trajectory(self, f, x, f1, f2, n)
-        return xs, ys # TODO: return all vectors and clusters only
-    
-    
-    # update_nc() allows self.nc to be updated for models that were saved 
-    # before the 'COUNT' issue in next_clusters was resolved
-    def update_nc(self):
-        self.nc = next_clusters(self.df_trained)
-        return
+        return xs, ys 
     
     
     # update_predictor
