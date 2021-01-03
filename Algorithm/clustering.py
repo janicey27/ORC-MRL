@@ -57,7 +57,7 @@ def split_train_test_by_id(data, # dataframe: all the data
     return data.loc[~in_test_set], data.loc[in_test_set]
 
 
-# initializeClusters() takes as input a dataframe, a time horizon T,
+# initializeClusters() takes as input a dataframe,
 # a clustering algorithm, a number of clusters n_clusters,
 # and a random seed (optional) and returns a dataframe
 # with two new columns 'CLUSTER' and 'NEXT_CLUSTER'
@@ -97,10 +97,10 @@ def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
 # findConstradiction() takes as input a dataframe and returns the tuple with
 # initial cluster and action that have the most number of contradictions or
 # (-1, -1) if no such cluster existss
-# METHOD FOR FINDIND CONTRADICTION:
-#METHOD1: Let s,a be a state action pair. We count the number of occurences of 
-# diffrent NEXT_CLUSTERS under action a starting from s. Let s' be NEXT_CLUSTER
-# Most elements from s went to under a. Let n2 be the number of elements that
+# METHOD FOR FINDING CONTRADICTION:
+# METHOD1: Let s,a be a state action pair. We count the number of occurences of 
+# different NEXT_CLUSTERS under action a starting from s. Let s' be NEXT_CLUSTER
+# most elements from s went to under a. Let n2 be the number of elements that
 # didn't go to s' under a. We chose (s,a) to maximize n2.
 # METHOD2: Here n2 is chosen as the number of elements that went to the second
 # most frequent NEXT_CLUSTER.
@@ -153,7 +153,7 @@ def multimode(data):
 
 
 # split() takes as input a dataframe, an initial cluster, an action, a target
-# cluster that is a contradiction c, a time horizon T, then number of features,
+# cluster that is a contradiction c, then number of features,
 # and an iterator k (that is the indexer of the next cluster), as well as the
 # predictive classification algorithm used
 # Returns a new dataframe with the contradiction resolved, and the best fit score
@@ -163,7 +163,7 @@ def split(df,  # pandas dataFrame
           a,  # integer: action taken
           c,  # integer: target cluster
           pfeatures,  # integer: number of features
-          k,  # integer: intedexer for next cluster
+          k,  # integer: indexer for next cluster
           classification='LogisticRegression', # string: classification aglo
           split_classifier_params={'random_state':0}): # dict: of classifier params
 
@@ -366,17 +366,26 @@ def splitter(df,  # pandas dataFrame
             #print(df_new.head())
             
             # update optimal dataframe if inc threshold and min error met
+            # threshold calculated using eta * sqrt(number of datapoints) / 
+            # number of clusters
             threshold = eta*df_new.shape[0]**0.5/(nc+1)
             thresholds.append(threshold)
             if verbose:
                 print('threshold:', threshold, 'max_incoherence:', max_inc)
-            if max_inc < threshold and train_error < (min_error-precision_thresh): # take first in plateau
+            
+            # only update the best dataframe if training error is smaller
+            # than previous training error by at least precision_thresh, 
+            # and also if maximum incoherence is lower than calculated threshold
+            if max_inc < threshold and train_error < (min_error-precision_thresh): 
                 min_error = train_error
                 best_df = df_new.copy()
                 opt_k = nc+1
                 if verbose:
                     print('new opt_k', opt_k)
-                
+            
+            # code for storing optimal clustering even if incorrect incoherence 
+            # threshold is chosen and nothing passes threshold; to prevent 
+            # training interruption
             elif opt_k == None and train_error < (backup_min_error-precision_thresh):
                 backup_min_error = train_error
                 backup_df = df_new.copy()
@@ -468,8 +477,8 @@ def splitter(df,  # pandas dataFrame
 
 
 # Splitter algorithm with Group K-fold cross-validation (number of folds from param cv)
-# Returns dataframes of incoherences, errors, and splitter split-scores, where
-# the optimal clustering can later be determined. 
+# Returns dataframes of incoherences, errors, and splitter split-scores; these
+# can be used to determine optimal clustering. 
 def fit_CV(df,
           pfeatures,
           th,
@@ -549,18 +558,15 @@ def fit_CV(df,
     df_training_error.set_index('Clusters', inplace=True)
     df_testing_error.set_index('Clusters', inplace=True)
     df_incoherences.set_index('Clusters', inplace=True)
+    
     df_training_error.dropna(inplace=True)
     df_testing_error.dropna(inplace=True)
     df_incoherences.dropna(inplace=True)
-    #print(df_training_error)
-    #print(df_testing_error)
+    
     cv_training_error = np.mean(df_training_error, axis=1)
     cv_testing_error = np.mean(df_testing_error, axis=1)
     cv_incoherences = np.mean(df_incoherences, axis=1)
 
-    #print(cv_training_error)
-    #print(cv_testing_error)
-    
     
     
     if plot:

@@ -39,11 +39,11 @@ def predict_cluster(df_new, # dataframe: trained clusters
     }
 
     m = DecisionTreeClassifier()
-    #m = RandomForestClassifier()
+    # m = RandomForestClassifier()
     
     m = GridSearchCV(m, params,cv = 5, iid=True) #will return warning if 'iid' param not set to true
 
-#    m = DecisionTreeClassifier(max_depth = 10)
+    # m = DecisionTreeClassifier(max_depth = 10)
     m.fit(X, y)
     return m
 
@@ -77,7 +77,7 @@ def get_MDP(df_new):
     P_df['NEXT_CLUSTER'] = transition_df.apply(lambda x: x[2])
     R_df = df_new.groupby('CLUSTER')['RISK'].mean()
     
-    # check if end state exists, if so make a sink node
+    # check if end state exists, if so make a sink node as the last cluster
     if 'End' in list(P_df['NEXT_CLUSTER'].unique()):
         P_df = P_df.reset_index()
         
@@ -101,7 +101,6 @@ def get_MDP(df_new):
         # set new reward node 
         R_df = R_df.append(pd.Series([0], index=[s]))
         
-        # print "end state defined as cluster __" 
         
     return P_df,R_df
 #################################################################
@@ -113,7 +112,7 @@ def get_MDP(df_new):
 
 # training_value_error() takes in a clustered dataframe, and computes the 
 # E((\hat{v}-v)^2) expected error in estimating values (risk) given actions
-# Returns a float of average value error per ID 
+# Returns a float of sqrt average value error per ID 
 def training_value_error(df_new, #Outpul of algorithm
                          gamma = 1, # discount factor
                          relative=False, #Output Raw error or RMSE ie ((\hat{v}-v)/v)^2
@@ -191,7 +190,7 @@ def training_value_error(df_new, #Outpul of algorithm
 # testing_value_error() takes in a dataframe of testing data, and dataframe of 
 # new clustered data, a model from predict_cluster function, and computes the
 # expected value error given actions and a predicted initial cluster and time
-# horizon h (ifh = -1, we forecast the whole path)
+# horizon h (if h = -1, we forecast the whole path)
 # Returns a float of sqrt average value error per ID
 def testing_value_error(df_test, 
                         df_new, 
@@ -650,7 +649,10 @@ def generalization_accuracy(models, df_test, Ns):
     plt.show()
     return tr_accs, test_accs
     
-# takes df of optimal policies
+# policy_accuracy() takes a trained model, and a df of optimal policies, 
+# and iterates through each row of the df to compare the model's predicted
+# action with that of the real action taken in the data
+# returns a percentage accuracy
 def policy_accuracy(m, df):
     if m.v is None:
         m.solve_MDP()

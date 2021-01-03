@@ -48,9 +48,10 @@ class MDP_model:
         
     # fit_CV() takes in parameters for prediction, and trains the model on the 
     # optimal clustering for a given horizon h (# of actions), using cross
-    # validation.
+    # validation. See fit_CV in clustering.py for further documentation. 
     def fit_CV(self, 
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+                # Needs a dataframe where 'ACTION' == 'None' if goal state is reached. 
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
             gamma=1, # discount value
@@ -95,7 +96,7 @@ class MDP_model:
                                                   n=-1,
                                                   plot = plot)
         
-        # find the best cluster by filtering by eta
+        # store cv testing error
         cv_testing_error = pd.concat([cv_testing_error.rename('Testing Error'), \
                                       cv_training_error.rename('Training Error'), \
                                       cv_incoherences.rename('Incoherence')], axis=1)
@@ -126,7 +127,7 @@ class MDP_model:
                                 distance_threshold = distance_threshold,
                                 random_state=random_state)
         
-        # change end state to 'end'
+        # Rename end state to 'end'
         df_init.loc[df_init['ACTION']=='None', 'NEXT_CLUSTER'] = 'End'
         
         df_new,df_incoherences,training_error,testing_error, best_df, opt_k, split_scores = splitter(df_init,
@@ -151,7 +152,7 @@ class MDP_model:
         pred = self.m.predict(df_new.iloc[:, 2:2+self.pfeatures])
         self.clus_pred_accuracy = accuracy_score(pred, df_new['CLUSTER'])
         
-        # store final training error
+        # store final training error and incoherenes
         self.training_error = training_value_error(self.df_trained)
         self.incoherences = df_incoherences
         self.split_scores = split_scores
@@ -167,9 +168,12 @@ class MDP_model:
         
     
     # fit() takes in the parameters for prediction, and directly fits the model
-    # to the data without running cross validation
+    # to the data without running cross validation. If optimize is set to True, 
+    # stores the best clustering in self.df_trained; otherwise stores the 
+    # clustering at when max_k number of clusters is reached. 
     def fit(self, 
             data, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+                # Needs a dataframe where 'ACTION' == 'None' if goal state is reached. 
             pfeatures, # int: number of features
             h=5, # int: time horizon (# of actions we want to optimize)
             gamma=1, # discount value
@@ -231,8 +235,10 @@ class MDP_model:
         self.split_scores = split_scores
         
         
-        # storing trained dataset and predict_cluster function.
-        # eta optimization is already done within splitter to find best_df and opt_k
+        # storing trained dataset and predict_cluster function, depending on
+        # whether optimization was selected
+        # incoherence and precision thresholds were already applied
+        # within splitter to find best_df and opt_k
         if optimize:
             self.df_trained = best_df
             #k = self.training_error['Clusters'].iloc[self.training_error['Error'].idxmin()]
@@ -240,7 +246,7 @@ class MDP_model:
         else:
             self.df_trained = df_new
             self.opt_k = self.training_error['Clusters'].max()
-            
+        
         self.m = predict_cluster(self.df_trained, self.pfeatures)
         pred = self.m.predict(self.df_trained.iloc[:, 2:2+self.pfeatures])
         self.clus_pred_accuracy = accuracy_score(pred, self.df_trained['CLUSTER'])
@@ -307,7 +313,7 @@ class MDP_model:
     # epsilon, whether the problem is a minimization or maximization one, 
     # and the threshold cutoffs to not include actions that don't appear enough
     # in each state, as well as purity cutoff for next_states that do not 
-    # represent enough percentage of all the potential next_states 
+    # represent enough percentage of all the potential next_states, 
     # and returns the the value and policy. When solving the MDP, creates an 
     # artificial punishment state that is reached for state/action pairs that 
     # don't meet the above cutoffs; also creates a sink node of reward 0 
