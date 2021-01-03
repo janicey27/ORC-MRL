@@ -67,7 +67,7 @@ df = createSamples(N, T_max, mazes[4], 0.4, reseed=True)
 # Run Algorithm
 
 m = MDP_model()
-m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
+m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', 'ACTION']
     pfeatures, # int: number of features
     h, # int: time horizon (# of actions we want to optimize)
     gamma, # discount factor
@@ -83,7 +83,7 @@ m.fit(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK', '
     n_clusters, # number of clusters for KMeans
     random_state,
     plot=False,
-    optimize=True,
+    #optimize=True,
     verbose=False)
 
 

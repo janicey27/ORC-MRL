@@ -205,7 +205,8 @@ def testing_value_error(df_test,
     df2 = df2.groupby(['ID']).first()
     N_test = df2.shape[0]
         
-    df_test['CLUSTER'] = model.predict(df_test.iloc[:, 2:2+pfeatures])
+    df_test = df_test.assign(CLUSTER = model.predict(df_test.iloc[:, 2:2+pfeatures]))
+    
     for i in range(N_test):
         # initializing index of first state for each ID
         index = df2['index'].iloc[i]
@@ -606,7 +607,7 @@ def testing_accuracy(df_test, # dataframe: testing data
     clusters = get_predictions(df_new)
     
     test_clusters = model.predict(df_test.iloc[:, 2:2+pfeatures])
-    df_test['CLUSTER'] = test_clusters
+    df_test = df_test.assign(CLUSTER = test_clusters)
     
     accuracy = clusters.loc[df_test['CLUSTER']].reset_index()['OG_CLUSTER'] \
                                         == df_test.reset_index()['OG_CLUSTER']
