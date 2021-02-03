@@ -26,6 +26,8 @@ For documentation on parameters used for fitting the model, **refer to the Jupyt
 1. **Maze** - this folder contains all the code required to run the algorithm on solving a Maze reinforcement learning environment. 
     1. `Maze_Experience` is the first Jupyter notebook to open, which contains a very thorough explanation of the algorithm as applied to the problem.
     1. `Maze_Experiment_Replication` contains code that explains and replicates the large-scale experiments executed for the paper.
-1. **Grid** - this folder contains a small experiment on that generates synthetic data to verify the model's performance on a 2D state space (similar to the maze, but without walls, and actions not translated physically to directions). `Grid_Experience` is the Jupyter Notebook with an explainer.
-1. **COVID** - 
+1. **Grid** - this folder contains a mini experiment on that generates synthetic data to verify the model's performance on a 2D state space (similar to the maze, but without walls, and actions not translated physically to directions). `Grid_Experience` is the Jupyter Notebook with an explainer.
+1. **COVID** - this folder contains the preliminary version of the code updated to fit the model to COVID-19 Prediction. The `Covid_Explainer` notebook contains the code and explanations for how the model was adapted to predict COVID-19 case trends.
+1. **HIV** - this folder contains code used to run experiments on HIV indicators. 
+1. **Toy** - this folder contains a mini experiment where the model is trained on a state space of concentric circles of expanding radii. 
 
