@@ -83,7 +83,7 @@ m.fit_CV(df, # df: dataframe in the format ['ID', 'TIME', ...features..., 'RISK'
     n_clusters, # number of clusters for KMeans
     random_state,
     plot=False,
-    #optimize=True,
+    optimize=True,
     verbose=False)
 
 

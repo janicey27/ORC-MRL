@@ -63,8 +63,8 @@ def split_train_test_by_id(data, # dataframe: all the data
 # with two new columns 'CLUSTER' and 'NEXT_CLUSTER'
 def initializeClusters(df,  # pandas dataFrame: MUST contain a "RISK" column
                        clustering='Agglomerative',  # string: clustering algorithm
-                       n_clusters= None,
-                       distance_threshold= 0.3,# number of clusters
+                       n_clusters= None, # number of clusters
+                       distance_threshold= 0.3,
                        random_state=0):  # random seed for the clustering
     df = df.copy()
     if clustering == 'KMeans':
