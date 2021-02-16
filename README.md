@@ -4,7 +4,7 @@ This is the Github repo that contains the code for and the experiments run on th
 
 Given a dataset with continuous state-action transitions across a number of steps, the model attempts to learn the minimal representation Markov Decision Process (MDP) that captures the dynamics of the environment solely by clustering datapoints based on **incoherences in transitions** (also refered to as contradictions). The trained model can then be used to predict values of the system given a starting state and a decision policy or sequence of actions, and can also be used to derive the optimal policy for a given agent to attain the highest reward.
 
-For more information about the premise of the algorithm, please refer to the accompanying paper.
+For more information about the premise of the algorithm, please refer to the accompanying paper: **Learning the Minimal Representation of a Dynamic System from Transition Data** https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3785547.
 
 ## Applying the Model
 The model class named `MDP_model` can be imported from the `model.py` file found in the `Algorithm` folder. Once an instance of this model class is initialized, one can then run `model.fit()` or `model.fit_CV()` to train the model on the dataframe given, without or with cross validation. 
